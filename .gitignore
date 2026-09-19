@@ -1,0 +1,10 @@
+# Local directory for Terraform clones and plugins
+.terraform/
+
+# State files
+*.tfstate
+*.tfstate.*
+
+# Variable value files
+*.tfvars
+*.tfvars.json

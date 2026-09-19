@@ -1,0 +1,48 @@
+name: "Deploy Resource Group and Storage Account for Terraform State"
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_apply:
+        description: 'Run terraform apply'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    name: "Terraform Run"
+    runs-on: ubuntu-latest
+    environment: dev
+
+    # Default working directory
+    defaults:
+      run:
+        working-directory: ./deploy-rg
+
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_USE_OIDC: "true"  # uses OIDC instead of client secret
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+      
+      - name: Initialize Terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan
+
+      - name: Terraform Apply
+        if: ${{ inputs.run_apply == true }}
+        run: terraform apply -auto-approve
