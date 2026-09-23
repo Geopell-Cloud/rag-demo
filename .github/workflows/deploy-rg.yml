@@ -1,6 +1,10 @@
 name: "Deploy Resource Group and Storage Account for Terraform State"
 
 on:
+  push: 
+   branches: 
+   - feature/**
+   - demo
   workflow_dispatch:
     inputs:
       run_apply:
