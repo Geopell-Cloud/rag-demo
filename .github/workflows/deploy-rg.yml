@@ -1,6 +1,9 @@
 name: "Deploy Resource Group and Storage Account for Terraform State"
 #this branch has no push trigger 
 on:
+  push:
+   branches:
+     - feature/**
   workflow_dispatch:
     inputs:
       run_apply:
