@@ -39,12 +39,9 @@ jobs:
       - name: Initialize Terraform
         run: terraform init
 
-      - name: Release Terraform State Lock
-        run: terraform force-unlock -force 5ad8844b-aa6a-1919-fbdc-d8b8ad79420b
+      - name: Terraform Plan
+        run: terraform plan
 
-      # - name: Terraform Plan
-      #   run: terraform plan
-
-      # - name: Terraform Apply
-      #   if: ${{ inputs.run_apply == true }}
-      #   run: terraform apply -auto-approve
+      - name: Terraform Apply
+        if: ${{ inputs.run_apply == true }}
+        run: terraform apply -auto-approve
