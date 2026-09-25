@@ -30,7 +30,7 @@ module "naming" {
 }
 
 resource "azurerm_storage_account" "rag_stacc" {
-  name                          = "ragstoragedev-${module.naming.storage_account.name_unique}"
+  name                          = "ragstoragedev${module.naming.storage_account.name_unique}"
   resource_group_name           = data.azurerm_resource_group.rg.name
   location                      = data.azurerm_resource_group.rg.location
   account_tier                  = "Standard"
@@ -115,7 +115,7 @@ resource "azurerm_search_service" "rag_search" {
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "rag_kv" {
-  name                       = "kv-rag-${module.naming.key_vault.name_unique}"
+  name                       = "kv-rag"
   location                   = data.azurerm_resource_group.rg.location
   resource_group_name        = data.azurerm_resource_group.rg.name
   rbac_authorization_enabled = false
