@@ -23,8 +23,14 @@ data "azurerm_resource_group" "rg" {
   name = "rag-demo-rg"
 }
 
+# Ensures unique CAF compliant name for resources
+module "naming" {
+  source  = "Azure/naming/azurerm"
+  version = "0.4.3"
+}
+
 resource "azurerm_storage_account" "rag_stacc" {
-  name                          = "ragstoragedev"
+  name                          = "ragstoragedev-${module.naming.storage_account.name_unique}"
   resource_group_name           = data.azurerm_resource_group.rg.name
   location                      = data.azurerm_resource_group.rg.location
   account_tier                  = "Standard"
@@ -60,12 +66,6 @@ resource "azurerm_cognitive_deployment" "rag_cogdeploy_openai" {
     name = "GlobalStandard"
     capacity = "5"
   }
-}
-
-# Ensures unique CAF compliant name for resources
-module "naming" {
-  source  = "Azure/naming/azurerm"
-  version = "0.4.3"
 }
 
 resource "azurerm_cognitive_account" "rag_cogacc_docintell" {
@@ -106,7 +106,7 @@ resource "azurerm_linux_function_app" "rag_funapp" {
 }
 
 resource "azurerm_search_service" "rag_search" {
-  name                = "azure-search-rag"
+  name                = "azure-search-rag-${module.naming.search_service.name_unique}"
   resource_group_name = data.azurerm_resource_group.rg.name
   location            =  "westus3"
   sku                 = "free"
@@ -115,7 +115,7 @@ resource "azurerm_search_service" "rag_search" {
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "rag_kv" {
-  name                       = "kv-rag"
+  name                       = "kv-rag-${module.naming.key_vault.name_unique}"
   location                   = data.azurerm_resource_group.rg.location
   resource_group_name        = data.azurerm_resource_group.rg.name
   rbac_authorization_enabled = false
