@@ -128,7 +128,7 @@ resource "azurerm_ai_foundry" "rag_hub" {
   name                = "foundry-hub-rag"
   location            = data.azurerm_resource_group.rg.location
   resource_group_name = data.azurerm_resource_group.rg.name
-  storage_account_id  = azurerm_storage_account.storage.id
+  storage_account_id  = azurerm_storage_account.rag_stacc.id
   key_vault_id        = azurerm_key_vault.rag_kv.id
 
   identity {
