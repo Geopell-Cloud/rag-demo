@@ -108,8 +108,8 @@ resource "azurerm_linux_function_app" "rag_funapp" {
 resource "azurerm_search_service" "rag_search" {
   name                = "azure-search-rag-${module.naming.search_service.name_unique}"
   resource_group_name = data.azurerm_resource_group.rg.name
-  location            = data.azurerm_resource_group.rg.location
-  sku                 = "free"
+  location            = "westus3"
+  sku                 = "basic"
 }
 
 data "azurerm_client_config" "current" {}
