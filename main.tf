@@ -108,7 +108,7 @@ resource "azurerm_linux_function_app" "rag_funapp" {
 resource "azurerm_search_service" "rag_search" {
   name                = "azure-search-rag-${module.naming.search_service.name_unique}"
   resource_group_name = data.azurerm_resource_group.rg.name
-  location            =  "westus3"
+  location            = data.azurerm_resource_group.rg.location
   sku                 = "free"
 }
 
@@ -124,20 +124,20 @@ resource "azurerm_key_vault" "rag_kv" {
   purge_protection_enabled   = false
 }
 
-resource "azurerm_ai_foundry" "rag_hub" {
-  name                = "foundry-hub-rag"
-  location            = data.azurerm_resource_group.rg.location
-  resource_group_name = data.azurerm_resource_group.rg.name
-  storage_account_id  = azurerm_storage_account.rag_stacc.id
-  key_vault_id        = azurerm_key_vault.rag_kv.id
+# resource "azurerm_ai_foundry" "rag_hub" {
+#   name                = "foundry-hub-rag"
+#   location            = data.azurerm_resource_group.rg.location
+#   resource_group_name = data.azurerm_resource_group.rg.name
+#   storage_account_id  = azurerm_storage_account.rag_stacc.id
+#   key_vault_id        = azurerm_key_vault.rag_kv.id
 
-  identity {
-    type = "SystemAssigned"
-  }
-}
+#   identity {
+#     type = "SystemAssigned"
+#   }
+# }
 
-resource "azurerm_ai_foundry_project" "rag_project" {
-  name               = "foundry-project-rag"
-  location           = data.azurerm_resource_group.rg.location
-  ai_services_hub_id = azurerm_ai_foundry.rag_hub.id
-}
+# resource "azurerm_ai_foundry_project" "rag_project" {
+#   name               = "foundry-project-rag"
+#   location           = data.azurerm_resource_group.rg.location
+#   ai_services_hub_id = azurerm_ai_foundry.rag_hub.id
+# }
