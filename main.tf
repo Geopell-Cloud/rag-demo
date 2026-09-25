@@ -108,7 +108,7 @@ resource "azurerm_linux_function_app" "rag_funapp" {
 resource "azurerm_search_service" "rag_search" {
   name                = "azure-search-rag-${module.naming.search_service.name_unique}"
   resource_group_name = data.azurerm_resource_group.rg.name
-  location            = "westus3"
+  location            = data.azurerm_resource_group.rg.location
   sku                 = "basic"
 }
 
