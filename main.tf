@@ -116,8 +116,8 @@ data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "rag_kv" {
   name                       = "kv-rag"
-  location                   = azurerm_resource_group.rg.location
-  resource_group_name        = azurerm_resource_group.rg.name
+  location                   = data.azurerm_resource_group.rg.location
+  resource_group_name        = data.azurerm_resource_group.rg.name
   rbac_authorization_enabled = false
   tenant_id                  = data.azurerm_client_config.current.tenant_id
   sku_name                   = "standard"
@@ -126,8 +126,8 @@ resource "azurerm_key_vault" "rag_kv" {
 
 resource "azurerm_ai_foundry" "rag_hub" {
   name                = "foundry-hub-rag"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = data.azurerm_resource_group.rg.location
+  resource_group_name = data.azurerm_resource_group.rg.name
   storage_account_id  = azurerm_storage_account.storage.id
   key_vault_id        = azurerm_key_vault.rag_kv.id
 
@@ -138,6 +138,6 @@ resource "azurerm_ai_foundry" "rag_hub" {
 
 resource "azurerm_ai_foundry_project" "rag_project" {
   name               = "foundry-project-rag"
-  location           = azurerm_resource_group.rg.location
+  location           = data.azurerm_resource_group.rg.location
   ai_services_hub_id = azurerm_ai_foundry.rag_hub.id
 }
