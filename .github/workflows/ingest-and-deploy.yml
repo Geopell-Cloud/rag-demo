@@ -58,7 +58,7 @@ jobs:
           terraform_wrapper: false   # keeps `terraform output` stdout clean
 
       - name: Initialize Terraform
-        run: terraform init -input=false
+        run: terraform init
 
       - name: Read Terraform outputs
         id: tf
