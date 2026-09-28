@@ -1,5 +1,6 @@
 # Local directory for Terraform clones and plugins
 .terraform/
+.DS_Store
 
 # State files
 *.tfstate
