@@ -20,6 +20,7 @@ jobs:
   get-endpoints:
     name: "Terraform Endpoints and Resource Names"
     runs-on: ubuntu-latest
+    environment: dev
 
     outputs:
       search_endpoint: ${{ steps.tf.outputs.search_endpoint }}
@@ -101,6 +102,7 @@ jobs:
   ingest:
     name: "Create Index and Ingest Docs"
     runs-on: ubuntu-latest
+    environment: dev
     needs: get-endpoints
     steps:
       - name: Checkout
@@ -152,6 +154,7 @@ jobs:
   deploy-function-app:
     name: "Deploy Function App"
     runs-on: ubuntu-latest
+    environment: dev
     needs: [get-endpoints, ingest]
     steps:
       - name: Checkout
