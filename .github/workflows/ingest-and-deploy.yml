@@ -99,6 +99,7 @@ jobs:
   # Uploads ./data to Blob Storage, builds the index, and ingests
   # ------------------------------------------------------------------
   ingest:
+    name: "Create Index and Ingest Docs"
     runs-on: ubuntu-latest
     needs: get-endpoints
     steps:
@@ -149,6 +150,7 @@ jobs:
   # Packages and deploys the Function App backend
   # ------------------------------------------------------------------
   deploy-function-app:
+    name: "Deploy Function App"
     runs-on: ubuntu-latest
     needs: [get-endpoints, ingest]
     steps:
