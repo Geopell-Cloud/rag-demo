@@ -35,7 +35,6 @@ jobs:
       ARM_USE_OIDC: "true"  # uses OIDC instead of client secret
       ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      ARM_USE_AZUREAD: "true"   # reads Terraform state with Entra ID auth instead of storage keys
 
       TF_VAR_azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
       TF_VAR_azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
@@ -60,7 +59,7 @@ jobs:
       - name: Initialize Terraform
         run: terraform init
 
-      - name: Read Terraform outputs
+      - name: Read Terraform Outputs
         id: tf
         run: |
           set -euo pipefail
