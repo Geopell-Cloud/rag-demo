@@ -8,6 +8,7 @@ permissions:
   contents: read
 
 env:
+  AZURE_STORAGE_ACCOUNT: ragstoragedevstqsfd
   AZURE_STORAGE_CONTAINER: rag-container
   AZURE_SEARCH_INDEX: rag-index
   AZURE_OPENAI_CHAT_DEPLOYMENT: gpt-5.1
@@ -107,7 +108,7 @@ jobs:
       - name: Upload Data Folder to Blob Storage
         run: |
           az storage blob upload-batch \
-            --account-name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
+            --account-name "${{ env.AZURE_STORAGE_ACCOUNT }}" \
             --destination "${{ env.AZURE_STORAGE_CONTAINER }}" \
             --source "data" \
             --auth-mode login \
