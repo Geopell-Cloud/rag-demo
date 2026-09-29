@@ -123,6 +123,14 @@ jobs:
         working-directory: ./ingestion
         run: pip install -r requirements-ingest.txt
 
+      - name: Debug
+        env:
+          AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
+        run: |
+          echo "length: ${#AZURE_SEARCH_ENDPOINT}"
+          echo "first 20 chars: ${AZURE_SEARCH_ENDPOINT:0:20}"
+          echo "starts with https: $([[ "$AZURE_SEARCH_ENDPOINT" == https://* ]] && echo yes || echo no)"
+
       - name: Create Search Index
         working-directory: ./ingestion
         env:
