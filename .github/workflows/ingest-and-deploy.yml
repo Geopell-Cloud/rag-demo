@@ -85,6 +85,16 @@ jobs:
               *) echo "::error::Unexpected endpoint value in Terraform outputs"; exit 1 ;;
             esac
           done
+          
+          # None of these are credentials, so they are not masked
+          {
+            echo "search_endpoint=${search_endpoint%/}"
+            echo "docintel_endpoint=${docintel_endpoint%/}"
+            echo "openai_endpoint=${openai_endpoint%/}"
+            echo "storage_account_name=$(get storage_account_name)"
+            echo "function_app_name=$(get function_app_name)"
+            echo "resource_group_name=$(get resource_group_name)"
+          } >> "$GITHUB_OUTPUT"
 
   # ------------------------------------------------------------------
   # Uploads ./data to Blob Storage, builds the index, and ingests
