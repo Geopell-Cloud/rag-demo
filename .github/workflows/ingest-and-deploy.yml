@@ -85,7 +85,7 @@ jobs:
               *) echo "::error::Unexpected endpoint value in Terraform outputs"; exit 1 ;;
             esac
           done
-          
+
           # None of these are credentials, so they are not masked
           {
             echo "search_endpoint=${search_endpoint%/}"
@@ -132,14 +132,6 @@ jobs:
       - name: Install Ingestion Dependencies
         working-directory: ./ingestion
         run: pip install -r requirements-ingest.txt
-
-      - name: Debug
-        env:
-          AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
-        run: |
-          echo "length: ${#AZURE_SEARCH_ENDPOINT}"
-          echo "first 20 chars: ${AZURE_SEARCH_ENDPOINT:0:20}"
-          echo "starts with https: $([[ "$AZURE_SEARCH_ENDPOINT" == https://* ]] && echo yes || echo no)"
 
       - name: Create Search Index
         working-directory: ./ingestion
