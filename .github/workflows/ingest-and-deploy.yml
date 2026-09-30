@@ -139,6 +139,14 @@ jobs:
           AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
         run: python create_index.py
 
+      - name: Check Deployment
+        run: |
+          az cognitiveservices account deployment list \
+            --name <your-openai-resource-name> \
+            --resource-group <rg> \
+            --query "[].{DeploymentName:name, Model:properties.model.name, Status:properties.provisioningState}" \
+            -o table
+
       - name: Ingest Documents
         working-directory: ./ingestion
         env:
