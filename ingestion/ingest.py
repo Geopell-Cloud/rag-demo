@@ -68,6 +68,10 @@ def main() -> None:
 
     for blob in container.list_blobs():
         print(f"Processing {blob.name} ...")
+
+        #Debug
+        print(f"Using embedding deployment: '{EMBEDDING_DEPLOYMENT}'")
+
         blob_bytes = container.download_blob(blob.name).readall()
         text = extract_text(blob_bytes)
 
