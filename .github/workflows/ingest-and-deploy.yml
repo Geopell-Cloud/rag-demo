@@ -12,7 +12,7 @@ env:
   AZURE_STORAGE_CONTAINER: rag-container
   AZURE_SEARCH_INDEX: rag-index
   AZURE_OPENAI_CHAT_DEPLOYMENT: gpt-5.1
-  AZURE_OPENAI_EMBEDDING_DEPLOYMENT: text-embedding-3-large
+  AZURE_OPENAI_EMBEDDING_DEPLOYMENT: text-embedding-3-small
 
 jobs:
   # ------------------------------------------------------------------
