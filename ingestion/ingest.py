@@ -23,7 +23,7 @@ SEARCH_ENDPOINT = os.environ["AZURE_SEARCH_ENDPOINT"]
 SEARCH_INDEX = os.environ.get("AZURE_SEARCH_INDEX", "rag-index")
 OPENAI_ENDPOINT = os.environ["AZURE_OPENAI_ENDPOINT"]
 OPENAI_API_VERSION = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21")
-EMBEDDING_DEPLOYMENT = os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-large")
+EMBEDDING_DEPLOYMENT = os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-small")
 
 CHUNK_SIZE = int(os.environ.get("CHUNK_SIZE", "1000"))       # characters
 CHUNK_OVERLAP = int(os.environ.get("CHUNK_OVERLAP", "200"))  # characters
