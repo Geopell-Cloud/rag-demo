@@ -69,7 +69,7 @@ resource "azurerm_cognitive_deployment" "rag_cogdeploy_openai" {
 }
 
 resource "azurerm_cognitive_deployment" "rag_cogdeploy_embed" {
-  name                 = "text-embedding-3-small"
+  name                 = "cog-deploy-embed-rag"
   cognitive_account_id = azurerm_cognitive_account.rag_cogacc_openai.id
 
   model {
