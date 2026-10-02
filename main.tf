@@ -79,7 +79,7 @@ resource "azurerm_cognitive_deployment" "rag_cogdeploy_embed" {
   }
 
   sku {
-    name     = "Standard"
+    name     = "GlobalStandard"
     capacity = 1
   }
 }
