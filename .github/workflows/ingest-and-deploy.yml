@@ -142,8 +142,8 @@ jobs:
       - name: Check Deployment
         run: |
           az cognitiveservices account deployment list \
-            --name <your-openai-resource-name> \
-            --resource-group <rg> \
+            --name cog-acc-openai-rag \
+            --resource-group ${{ needs.get-endpoints.outputs.resource_group_name }} \
             --query "[].{DeploymentName:name, Model:properties.model.name, Status:properties.provisioningState}" \
             -o table
 
