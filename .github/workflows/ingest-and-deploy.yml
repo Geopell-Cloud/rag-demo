@@ -133,6 +133,38 @@ jobs:
         working-directory: ./ingestion
         run: pip install -r requirements-ingest.txt
 
+      - name: Debug - raw REST call to the search data plane and lock status (temporary)
+        env:
+          AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
+        run: |
+          set -euo pipefail
+
+          token=$(az account get-access-token --resource https://search.azure.com --query accessToken -o tsv)
+
+          echo "=== GET /indexes (list) ==="
+          curl -sS -D - -o /tmp/list_body.json \
+            "${AZURE_SEARCH_ENDPOINT}/indexes?api-version=2024-07-01" \
+            -H "Authorization: Bearer ${token}"
+          echo "--- body ---"
+          cat /tmp/list_body.json
+          echo
+
+          echo "=== GET /indexes/rag-index (does it already exist / can we read it) ==="
+          curl -sS -D - -o /tmp/get_body.json \
+            "${AZURE_SEARCH_ENDPOINT}/indexes/${AZURE_SEARCH_INDEX}?api-version=2024-07-01" \
+            -H "Authorization: Bearer ${token}"
+          echo "--- body ---"
+          cat /tmp/get_body.json
+
+          az lock list \
+            --resource-group "$RESOURCE_GROUP" \
+            -o table
+
+          az lock list \
+            --resource "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Search/searchServices/$(echo "$AZURE_SEARCH_ENDPOINT" | sed -E 's#https://([^.]+)\..*#\1#')" \
+            --resource-type Microsoft.Search/searchServices \
+            -o table
+
       - name: Create Search Index
         working-directory: ./ingestion
         env:
