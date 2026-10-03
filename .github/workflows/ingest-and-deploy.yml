@@ -134,7 +134,7 @@ jobs:
         run: pip install -r requirements-ingest.txt
 
       - name: Debug - show which identity DefaultAzureCredential resolves (temporary)
-        working-directory: rag-app/ingestion
+        working-directory: ./ingestion
         run: |
           python - << 'PYEOF'
           import base64, json
