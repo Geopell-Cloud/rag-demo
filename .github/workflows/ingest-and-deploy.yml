@@ -133,6 +133,24 @@ jobs:
         working-directory: ./ingestion
         run: pip install -r requirements-ingest.txt
 
+      - name: Debug - show which identity DefaultAzureCredential resolves (temporary)
+        working-directory: rag-app/ingestion
+        run: |
+          python - << 'PYEOF'
+          import base64, json
+          from azure.identity import DefaultAzureCredential
+
+          cred = DefaultAzureCredential()
+          token = cred.get_token("https://search.azure.com/.default")
+
+          # Decode the JWT payload (no signature check needed, just for inspection)
+          payload_b64 = token.token.split(".")[1]
+          payload_b64 += "=" * (-len(payload_b64) % 4)  # pad for base64
+          claims = json.loads(base64.urlsafe_b64decode(payload_b64))
+
+          print("aud (audience):   ", claims.get("aud"))
+          PYEOF
+
       - name: Create Search Index
         working-directory: ./ingestion
         env:
