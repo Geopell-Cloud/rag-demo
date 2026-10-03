@@ -133,75 +133,11 @@ jobs:
         working-directory: ./ingestion
         run: pip install -r requirements-ingest.txt
 
-      - name: Debug - check create search index response (temporary)
-        env:
-          AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
-          AZURE_SEARCH_INDEX: rag-index
-          EMBEDDING_DIMENSIONS: 1536   # match whatever create_index.py currently uses
-          RESOURCE_GROUP: ${{ needs.get-endpoints.outputs.resource_group_name }}
-        run: |
-          # Check response
-          python - << 'PYEOF'
-          import json, os
-          import requests
-          from azure.identity import DefaultAzureCredential
-
-          endpoint = os.environ["AZURE_SEARCH_ENDPOINT"]
-          index_name = os.environ.get("AZURE_SEARCH_INDEX", "rag-index")
-          dims = int(os.environ.get("EMBEDDING_DIMENSIONS", "1536"))
-
-          cred = DefaultAzureCredential()
-          token = cred.get_token("https://search.azure.com/.default").token
-
-          # Same schema shape as create_index.py, built as raw JSON
-          # so nothing goes through the SDK's request/response pipeline.
-          body = {
-              "name": index_name,
-              "fields": [
-                  {"name": "id", "type": "Edm.String", "key": True, "searchable": False},
-                  {"name": "content", "type": "Edm.String", "searchable": True},
-                  {"name": "source", "type": "Edm.String", "filterable": True, "facetable": True},
-                  {
-                      "name": "content_vector",
-                      "type": "Collection(Edm.Single)",
-                      "searchable": True,
-                      "dimensions": dims,
-                      "vectorSearchProfile": "default-profile",
-                  },
-              ],
-              "vectorSearch": {
-                  "algorithms": [{"name": "default-hnsw", "kind": "hnsw"}],
-                  "profiles": [
-                      {"name": "default-profile", "algorithm": "default-hnsw"}
-                  ],
-              },
-          }
-
-          url = f"{endpoint}/indexes('{index_name}')"
-          resp = requests.put(
-              url,
-              params={"api-version": "2024-07-01"},
-              headers={
-                  "Authorization": f"Bearer {token}",
-                  "Content-Type": "application/json",
-              },
-              data=json.dumps(body),
-          )
-
-          print("URL:        ", resp.url)
-          print("Status code:", resp.status_code)
-          print("\n--- Response headers ---")
-          for k, v in resp.headers.items():
-              print(f"{k}: {v}")
-          print("\n--- Response body ---")
-          print(f"(length: {len(resp.content)} bytes)")
-          print(resp.text)
-          PYEOF
-
       - name: Create Search Index
         working-directory: ./ingestion
         env:
           AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
+          EMBEDDING_DIMENSIONS: "1536"
         run: python create_index.py
 
       - name: Ingest Documents
