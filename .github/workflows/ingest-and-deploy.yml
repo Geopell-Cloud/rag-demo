@@ -140,17 +140,6 @@ jobs:
           EMBEDDING_DIMENSIONS: 1536   # match whatever create_index.py currently uses
           RESOURCE_GROUP: ${{ needs.get-endpoints.outputs.resource_group_name }}
         run: |
-          # Confirm auth setting
-          az search service show \
-            --name $(echo "${AZURE_SEARCH_ENDPOINT}" | sed -E 's#https://([^.]+)\..*#\1#') --resource-group ${RESOURCE_GROUP} \
-            --query "{authOptions:authOptions, disableLocalAuth:disableLocalAuth}" -o json
-
-          # Change auth setting
-          az search service update \
-            --name $(echo "${AZURE_SEARCH_ENDPOINT}" | sed -E 's#https://([^.]+)\..*#\1#') --resource-group ${RESOURCE_GROUP} \
-            --auth-options aadOrApiKey \
-            --aad-auth-failure-mode http401WithBearerChallenge
-
           # Check response
           python - << 'PYEOF'
           import json, os
@@ -208,17 +197,6 @@ jobs:
           print(f"(length: {len(resp.content)} bytes)")
           print(resp.text)
           PYEOF
-
-          # Revert auth setting
-          az search service update \
-            --name $(echo "${AZURE_SEARCH_ENDPOINT}" | sed -E 's#https://([^.]+)\..*#\1#') --resource-group ${RESOURCE_GROUP} \
-            --auth-options aadOrApiKey \
-            --aad-auth-failure-mode http403
-
-          # Confirm auth setting
-          az search service show \
-            --name $(echo "${AZURE_SEARCH_ENDPOINT}" | sed -E 's#https://([^.]+)\..*#\1#') --resource-group ${RESOURCE_GROUP} \
-            --query "{authOptions:authOptions, disableLocalAuth:disableLocalAuth}" -o json
 
       - name: Create Search Index
         working-directory: ./ingestion
