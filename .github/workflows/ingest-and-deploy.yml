@@ -136,6 +136,7 @@ jobs:
       - name: Debug - raw REST call to the search data plane and lock status (temporary)
         env:
           AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
+          RESOURCE_GROUP: ${{ needs.get-endpoints.outputs.resource_group_name }}
         run: |
           set -euo pipefail
 
