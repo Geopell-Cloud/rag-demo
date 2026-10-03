@@ -20,7 +20,7 @@ from azure.search.documents.indexes.models import (
 
 ENDPOINT = os.environ["AZURE_SEARCH_ENDPOINT"]
 INDEX_NAME = os.environ.get("AZURE_SEARCH_INDEX", "rag-index")
-EMBEDDING_DIMENSIONS = int(os.environ.get("EMBEDDING_DIMENSIONS", "1536"))  # text-embedding-3-small
+EMBEDDING_DIMENSIONS = int(os.environ.get("EMBEDDING_DIMENSIONS", "3072"))  # text-embedding-3-large
 
 credential = DefaultAzureCredential()
 index_client = SearchIndexClient(endpoint=ENDPOINT, credential=credential)

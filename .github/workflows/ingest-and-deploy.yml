@@ -96,9 +96,6 @@ jobs:
             echo "resource_group_name=$(get resource_group_name)"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Debug - dump this job's GITHUB_OUTPUT (temporary)
-        run: cat "$GITHUB_OUTPUT"
-
   # ------------------------------------------------------------------
   # Uploads ./data to Blob Storage, builds the index, and ingests
   # ------------------------------------------------------------------
@@ -136,76 +133,11 @@ jobs:
         working-directory: ./ingestion
         run: pip install -r requirements-ingest.txt
 
-      - name: Debug - show resolved endpoint (temporary)
-        env:
-          AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
-        run: |
-          echo "length: ${#AZURE_SEARCH_ENDPOINT}"
-          echo "first 20 chars: ${AZURE_SEARCH_ENDPOINT:0:20}"
-          echo "starts with https: $([[ "$AZURE_SEARCH_ENDPOINT" == https://* ]] && echo yes || echo no)"
-
-      - name: Debug - show role assignments on the search service (temporary)
-        env:
-          AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
-          RESOURCE_GROUP: ${{ needs.get-endpoints.outputs.resource_group_name }}
-        run: |
-          set -euo pipefail
-
-          # Pull the search service name back out of its endpoint
-          # (https://<name>.search.windows.net -> <name>)
-          search_name=$(echo "$AZURE_SEARCH_ENDPOINT" | sed -E 's#https://([^.]+)\..*#\1#')
-          echo "search service name: $search_name"
-
-          sub_id=$(az account show --query id -o tsv)
-          search_scope="/subscriptions/${sub_id}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.Search/searchServices/${search_name}"
-          echo "scope queried: $search_scope"
-
-          # Resolve the service principal's object id from its client (app) id.
-          # Role assignments are keyed by object id, not client id.
-          principal_id=$(az ad sp show --id "${{ secrets.AZURE_CLIENT_ID }}" --query id -o tsv)
-          echo "principal_id: $principal_id"
-
-          # List role assignments at this scope via the ARM REST API directly,
-          # then filter down to just this principal and resolve role names.
-          az rest --method get \
-            --url "https://management.azure.com${search_scope}/providers/Microsoft.Authorization/roleAssignments" \
-            --url-parameters "api-version=2022-04-01" \
-            --query "value[?properties.principalId=='${principal_id}'].properties.roleDefinitionId" \
-            -o tsv \
-          | while read -r role_def_id; do
-              az role definition list --custom-role-only false \
-                --query "[?id=='${role_def_id}'].roleName" -o tsv 2>/dev/null \
-                || echo "$role_def_id"
-            done
-
-      - name: Debug - show search service network rules (temporary)
-        env:
-          AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
-          RESOURCE_GROUP: ${{ needs.get-endpoints.outputs.resource_group_name }}
-        run: |
-          set -euo pipefail
-
-          search_name=$(echo "$AZURE_SEARCH_ENDPOINT" | sed -E 's#https://([^.]+)\..*#\1#')
-
-          az search service show \
-            --name "$search_name" \
-            --resource-group "$RESOURCE_GROUP" \
-            --query "{publicNetworkAccess: publicNetworkAccess, networkRuleSet: networkRuleSet}" \
-            -o json
-
       - name: Create Search Index
         working-directory: ./ingestion
         env:
           AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
         run: python create_index.py
-
-      - name: Check Deployment
-        run: |
-          az cognitiveservices account deployment list \
-            --name cog-acc-openai-rag \
-            --resource-group ${{ needs.get-endpoints.outputs.resource_group_name }} \
-            --query "[].{DeploymentName:name, Model:properties.model.name, Status:properties.provisioningState}" \
-            -o table
 
       - name: Ingest Documents
         working-directory: ./ingestion
