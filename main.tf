@@ -68,21 +68,21 @@ resource "azurerm_cognitive_deployment" "rag_cogdeploy_openai" {
   }
 }
 
-# resource "azurerm_cognitive_deployment" "rag_cogdeploy_embed" {
-#   name                 = "cog-deploy-embed-rag"
-#   cognitive_account_id = azurerm_cognitive_account.rag_cogacc_openai.id
+resource "azurerm_cognitive_deployment" "rag_cogdeploy_embed" {
+  name                 = "cog-deploy-embed-rag"
+  cognitive_account_id = azurerm_cognitive_account.rag_cogacc_openai.id
 
-#   model {
-#     format  = "OpenAI"
-#     name    = "text-embedding-3-small"
-#     version = "1"
-#   }
+  model {
+    format  = "OpenAI"
+    name    = "text-embedding-3-small"
+    version = "1"
+  }
 
-#   sku {
-#     name     = "GlobalStandard"
-#     capacity = 1
-#   }
-# }
+  sku {
+    name     = "GlobalStandard"
+    capacity = 5
+  }
+}
 
 resource "azurerm_cognitive_account" "rag_cogacc_docintell" {
   name                          = "cog-acc-docintell-rag-${module.naming.cognitive_account.name_unique}"
