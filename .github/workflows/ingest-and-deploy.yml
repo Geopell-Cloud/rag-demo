@@ -158,11 +158,11 @@ jobs:
           cat /tmp/get_body.json
 
           az lock list \
-            --resource-group "$RESOURCE_GROUP" \
+            --resource-group "${RESOURCE_GROUP}" \
             -o table
 
           az lock list \
-            --resource "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Search/searchServices/$(echo "$AZURE_SEARCH_ENDPOINT" | sed -E 's#https://([^.]+)\..*#\1#')" \
+            --resource "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.Search/searchServices/$(echo "${AZURE_SEARCH_ENDPOINT}" | sed -E 's#https://([^.]+)\..*#\1#')" \
             --resource-type Microsoft.Search/searchServices \
             -o table
 
