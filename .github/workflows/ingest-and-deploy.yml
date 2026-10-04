@@ -139,6 +139,13 @@ jobs:
           AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
           EMBEDDING_DIMENSIONS: "1536"
         run: python create_index.py
+ 
+      - name: Debug - show resolved OpenAI endpoint and deployment (temporary)
+        env:
+          AZURE_OPENAI_ENDPOINT: ${{ needs.get-endpoints.outputs.openai_endpoint }}
+        run: |
+          echo "'${AZURE_OPENAI_ENDPOINT}'"
+          echo "'${{ env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}'"
 
       - name: Ingest Documents
         working-directory: ./ingestion

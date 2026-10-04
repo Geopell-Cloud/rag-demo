@@ -72,6 +72,7 @@ def main() -> None:
         text = extract_text(blob_bytes)
 
         for chunk in chunk_text(text):
+            print(f"Using embedding deployment: '{EMBEDDING_DEPLOYMENT}'")
             batch.append(
                 {
                     "id": str(uuid.uuid4()),
