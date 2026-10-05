@@ -50,7 +50,7 @@ resource "azurerm_storage_container" "rag_stcont" {
 }
 
 resource "azurerm_cognitive_deployment" "rag_cogdeploy_chat" {
-  name                 = "cog-deploy-chat-rag"
+  name                 = "rag-cog-deploy-chat"
   cognitive_account_id = data.azurerm_cognitive_account.rag_shared_foundry.id
 
   model {
@@ -66,7 +66,7 @@ resource "azurerm_cognitive_deployment" "rag_cogdeploy_chat" {
 }
 
 resource "azurerm_cognitive_deployment" "rag_cogdeploy_embed" {
-  name                 = "cog-deploy-embed-rag"
+  name                 = "rag-cog-deploy-embed"
   cognitive_account_id = data.azurerm_cognitive_account.rag_shared_foundry.id
 
   model {
@@ -82,7 +82,7 @@ resource "azurerm_cognitive_deployment" "rag_cogdeploy_embed" {
 }
 
 resource "azurerm_service_plan" "rag_srvplan" {
-  name                = "srvplan-rag"
+  name                = "rag-srvplan"
   resource_group_name = data.azurerm_resource_group.rg.name
   location            = "westus2"
   os_type             = "Linux"
@@ -90,7 +90,7 @@ resource "azurerm_service_plan" "rag_srvplan" {
 }
 
 resource "azurerm_linux_function_app" "rag_funapp" {
-  name                       = "funapp-rag"
+  name                       = "rag-funapp"
   resource_group_name        = data.azurerm_resource_group.rg.name
   location                   = azurerm_service_plan.rag_srvplan.location
   storage_account_name       = azurerm_storage_account.rag_stacc.name
@@ -110,7 +110,7 @@ resource "azurerm_linux_function_app" "rag_funapp" {
 }
 
 resource "azurerm_search_service" "rag_search" {
-  name                = "azure-search-rag-${module.naming.search_service.name_unique}"
+  name                = "rag-${module.naming.search_service.name_unique}"
   resource_group_name = data.azurerm_resource_group.rg.name
   location            = data.azurerm_resource_group.rg.location
   sku                 = "basic"
@@ -119,7 +119,7 @@ resource "azurerm_search_service" "rag_search" {
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "rag_kv" {
-  name                       = "kv-rag-${module.naming.key_vault.name_unique}"
+  name                       = "rag-${module.naming.key_vault.name_unique}"
   location                   = data.azurerm_resource_group.rg.location
   resource_group_name        = data.azurerm_resource_group.rg.name
   rbac_authorization_enabled = false
