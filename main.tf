@@ -119,7 +119,7 @@ resource "azurerm_search_service" "rag_search" {
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "rag_kv" {
-  name                       = "kv-rag-${module.naming.search_service.name_unique}"
+  name                       = "kv-rag-${module.naming.key_vault.name_unique}"
   location                   = data.azurerm_resource_group.rg.location
   resource_group_name        = data.azurerm_resource_group.rg.name
   rbac_authorization_enabled = false
