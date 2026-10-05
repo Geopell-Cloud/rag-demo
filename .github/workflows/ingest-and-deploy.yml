@@ -199,3 +199,83 @@ jobs:
               AZURE_OPENAI_CHAT_DEPLOYMENT="${{ env.AZURE_OPENAI_CHAT_DEPLOYMENT }}" \
               AZURE_OPENAI_EMBEDDING_DEPLOYMENT="${{ env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}" \
             --output none
+
+  # ----------------------------------------------------------------
+  # Deploys the static frontend to the Storage Account's static 
+  # website ($web container), with API_BASE/FUNCTION_KEY templated 
+  # in at deploy time so no secrets live in the committed files
+  # ----------------------------------------------------------------
+  deploy-frontend:
+    name: "Deploy App Frontend"
+    runs-on: ubuntu-latest
+    environment: dev
+    needs: [get-endpoints, deploy-function-app]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Fetch Function Key
+        id: func_key
+        run: |
+          set -euo pipefail
+          key=$(az functionapp function keys list \
+            --name "${{ needs.get-endpoints.outputs.function_app_name }}" \
+            --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
+            --function-name chat \
+            --query default -o tsv)
+          if [ -z "$key" ]; then
+            echo "::error::Could not retrieve a function key for the 'chat' function"
+            exit 1
+          fi
+          # Mask it in logs even though it's also passed as a step output
+          echo "::add-mask::$key"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Enable Static Website Hosting on Storage Account
+        run: |
+          az storage blob service-properties update \
+            --account-name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
+            --auth-mode login \
+            --static-website \
+            --index-document index.html \
+            --404-document index.html
+
+      - name: Template Frontend Config and Upload to $web Container
+        env:
+          FUNCTION_KEY: ${{ steps.func_key.outputs.key }}
+        run: |
+          set -euo pipefail
+
+          # Work on a copy so the committed source files are never modified.
+          rm -rf /tmp/frontend-dist
+          cp -r ./frontend /tmp/frontend-dist
+
+          api_base="https://${{ needs.get-endpoints.outputs.function_app_name }}.azurewebsites.net/api"
+
+          sed -i \
+            -e "s#REPLACE_WITH_FUNCTION_APP_URL/api#${api_base}#g" \
+            -e "s#REPLACE_WITH_FUNCTION_KEY#${FUNCTION_KEY}#g" \
+            /tmp/frontend-dist/app.js
+
+          az storage blob upload-batch \
+            --account-name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
+            --destination '$web' \
+            --source /tmp/frontend-dist \
+            --auth-mode login \
+            --overwrite
+
+      - name: Show Frontend URL
+        run: |
+          url=$(az storage account show \
+            --name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
+            --query "primaryEndpoints.web" -o tsv)
+          echo "Frontend URL: $url"
+          echo "### Frontend deployed" >> "$GITHUB_STEP_SUMMARY"
+          echo "$url" >> "$GITHUB_STEP_SUMMARY"
