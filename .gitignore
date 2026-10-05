@@ -5,6 +5,7 @@
 # State files
 *.tfstate
 *.tfstate.*
+.terraform.lock.hcl
 
 # Variable value files
 *.tfvars

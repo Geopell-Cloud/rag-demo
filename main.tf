@@ -23,6 +23,11 @@ data "azurerm_resource_group" "rg" {
   name = "rag-demo-rg"
 }
 
+data "azurerm_cognitive_account" "rag_shared_foundry" {
+  name                = "paschalogbannu-6488-resource"
+  resource_group_name = "ai-rcm-dev"
+}
+
 # Ensures unique CAF compliant name for resources
 module "naming" {
   source  = "Azure/naming/azurerm"
@@ -44,22 +49,14 @@ resource "azurerm_storage_container" "rag_stcont" {
   container_access_type = "private"
 }
 
-resource "azurerm_cognitive_account" "rag_cogacc_openai" {
-  name                = "cog-acc-openai-rag"
-  location            = "westus3"
-  resource_group_name = data.azurerm_resource_group.rg.name
-  kind                = "OpenAI"
-  sku_name            = "S0"
-}
-
-resource "azurerm_cognitive_deployment" "rag_cogdeploy_openai" {
-  name                 = "cog-deploy-openai-rag"
-  cognitive_account_id = azurerm_cognitive_account.rag_cogacc_openai.id
+resource "azurerm_cognitive_deployment" "rag_cogdeploy_chat" {
+  name                 = "cog-deploy-chat-rag"
+  cognitive_account_id = data.azurerm_cognitive_account.rag_shared_foundry.id
 
   model {
     format  = "OpenAI"
-    name    = "gpt-5.1"
-    version = "2025-11-13"
+    name    = "gpt-5.4-mini"
+    version = "2026-03-17"
   }
 
   sku {
@@ -70,7 +67,7 @@ resource "azurerm_cognitive_deployment" "rag_cogdeploy_openai" {
 
 resource "azurerm_cognitive_deployment" "rag_cogdeploy_embed" {
   name                 = "cog-deploy-embed-rag"
-  cognitive_account_id = azurerm_cognitive_account.rag_cogacc_openai.id
+  cognitive_account_id = data.azurerm_cognitive_account.rag_shared_foundry.id
 
   model {
     format  = "OpenAI"
@@ -80,17 +77,8 @@ resource "azurerm_cognitive_deployment" "rag_cogdeploy_embed" {
 
   sku {
     name     = "GlobalStandard"
-    capacity = 5
+    capacity = 1
   }
-}
-
-resource "azurerm_cognitive_account" "rag_cogacc_docintell" {
-  name                          = "cog-acc-docintell-rag-${module.naming.cognitive_account.name_unique}"
-  location                      = "westus3"
-  resource_group_name           = data.azurerm_resource_group.rg.name
-  kind                          = "FormRecognizer"
-  sku_name                      = "S0"
-  public_network_access_enabled = true
 }
 
 resource "azurerm_service_plan" "rag_srvplan" {
@@ -131,7 +119,7 @@ resource "azurerm_search_service" "rag_search" {
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "rag_kv" {
-  name                       = "kv-rag"
+  name                       = "kv-rag-${module.naming.search_service.name_unique}"
   location                   = data.azurerm_resource_group.rg.location
   resource_group_name        = data.azurerm_resource_group.rg.name
   rbac_authorization_enabled = false

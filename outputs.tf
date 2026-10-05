@@ -4,11 +4,11 @@ output "search_endpoint" {
 }
 
 output "docintel_endpoint" {
-  value = azurerm_cognitive_account.rag_cogacc_docintell.endpoint
+  value = data.azurerm_cognitive_account.rag_shared_foundry.endpoint
 }
 
 output "openai_endpoint" {
-  value = azurerm_cognitive_account.rag_cogacc_openai.endpoint
+  value = data.azurerm_cognitive_account.rag_shared_foundry.endpoint
 }
 
 output "storage_account_name" {
