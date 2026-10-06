@@ -64,10 +64,10 @@ main {
 #empty-state {
   margin: auto;
   text-align: center;
-  max-width: 590px;
+  max-width: 650px;
 }
 #empty-state h1 { font-size: 1.6rem; color: var(--brand); margin-bottom: 8px; }
-#empty-state p { color: var(--muted); margin-bottom: 24px; }
+#empty-state p { color: var(--muted); margin: 0 auto 24px; max-width: 540px; }
 .examples {
   display: grid;
   grid-template-columns: 1fr 1fr;
