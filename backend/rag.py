@@ -1,30 +1,30 @@
 import os
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.search.documents.models import VectorizedQuery
 from openai import AzureOpenAI
 
 AZURE_SEARCH_ENDPOINT = os.environ["AZURE_SEARCH_ENDPOINT"]
 AZURE_SEARCH_INDEX = os.environ.get("AZURE_SEARCH_INDEX", "rag-index")
+AZURE_SEARCH_API_KEY = os.environ["AZURE_SEARCH_API_KEY"]
 AZURE_OPENAI_ENDPOINT = os.environ["AZURE_OPENAI_ENDPOINT"]
+AZURE_OPENAI_API_KEY = os.environ["AZURE_OPENAI_API_KEY"]
 AZURE_OPENAI_CHAT_DEPLOYMENT = os.environ.get("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-5.4-mini")
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT = os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-small")
 AZURE_OPENAI_API_VERSION = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21")
 TOP_K = int(os.environ.get("RAG_TOP_K", "5"))
 
-# Single managed-identity credential, reused for both Search and OpenAI.
-credential = DefaultAzureCredential()
-token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
+# API-key auth for both Search and OpenAI. No managed identity or role assignments needed
 
 search_client = SearchClient(
     endpoint=AZURE_SEARCH_ENDPOINT,
     index_name=AZURE_SEARCH_INDEX,
-    credential=credential,
+    credential=AzureKeyCredential(AZURE_SEARCH_API_KEY),
 )
 
 openai_client = AzureOpenAI(
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    azure_ad_token_provider=token_provider,
+    api_key=AZURE_OPENAI_API_KEY,
     api_version=AZURE_OPENAI_API_VERSION,
 )
 

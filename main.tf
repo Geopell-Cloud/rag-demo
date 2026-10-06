@@ -114,16 +114,8 @@ resource "azurerm_search_service" "rag_search" {
   resource_group_name = data.azurerm_resource_group.rg.name
   location            = data.azurerm_resource_group.rg.location
   sku                 = "basic"
-}
 
-data "azurerm_client_config" "current" {}
-
-resource "azurerm_key_vault" "rag_kv" {
-  name                       = "rag-${module.naming.key_vault.name_unique}"
-  location                   = data.azurerm_resource_group.rg.location
-  resource_group_name        = data.azurerm_resource_group.rg.name
-  rbac_authorization_enabled = false
-  tenant_id                  = data.azurerm_client_config.current.tenant_id
-  sku_name                   = "standard"
-  purge_protection_enabled   = false
+  # Configures authOptions.aadOrApiKey
+  local_authentication_enabled = true
+  authentication_failure_mode  = "http403"
 }

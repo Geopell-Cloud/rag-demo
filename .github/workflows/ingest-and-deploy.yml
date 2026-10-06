@@ -187,7 +187,33 @@ jobs:
           scm-do-build-during-deployment: false
           enable-oryx-build: false
 
+      - name: Fetch Search and OpenAI API keys
+        id: data_keys
+        run: |
+          set -euo pipefail
+
+          search_name=$(echo "${{ needs.get-endpoints.outputs.search_endpoint }}" | sed -E 's#https://([^.]+)\..*#\1#')
+          search_key=$(az search admin-key show \
+            --service-name "$search_name" \
+            --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
+            --query primaryKey -o tsv)
+
+          openai_name=$(echo "${{ needs.get-endpoints.outputs.openai_endpoint }}" | sed -E 's#https://([^.]+)\..*#\1#')
+          openai_key=$(az cognitiveservices account keys list \
+            --name "$openai_name" \
+            --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
+            --query key1 -o tsv)
+
+          # Mask them in logs
+          echo "::add-mask::$search_key"
+          echo "::add-mask::$openai_key"
+          echo "search_key=$search_key" >> "$GITHUB_OUTPUT"
+          echo "openai_key=$openai_key" >> "$GITHUB_OUTPUT"
+
       - name: Configure App Settings
+        env:
+          AZURE_SEARCH_API_KEY: ${{ steps.data_keys.outputs.search_key }}
+          AZURE_OPENAI_API_KEY: ${{ steps.data_keys.outputs.openai_key }}
         run: |
           az functionapp config appsettings set \
             --name "${{ needs.get-endpoints.outputs.function_app_name }}" \
@@ -195,7 +221,9 @@ jobs:
             --settings \
               AZURE_SEARCH_ENDPOINT="${{ needs.get-endpoints.outputs.search_endpoint }}" \
               AZURE_SEARCH_INDEX="${{ env.AZURE_SEARCH_INDEX }}" \
+              AZURE_SEARCH_API_KEY="${AZURE_SEARCH_API_KEY}" \
               AZURE_OPENAI_ENDPOINT="${{ needs.get-endpoints.outputs.openai_endpoint }}" \
+              AZURE_OPENAI_API_KEY="${AZURE_OPENAI_API_KEY}" \
               AZURE_OPENAI_CHAT_DEPLOYMENT="${{ env.AZURE_OPENAI_CHAT_DEPLOYMENT }}" \
               AZURE_OPENAI_EMBEDDING_DEPLOYMENT="${{ env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}" \
             --output none
@@ -287,6 +315,7 @@ jobs:
 
       - name: Show Frontend URL
         run: |
-          echo "Frontend URL: ${{ steps.static_site.outputs.url }}"
+          echo "Frontend URL: "
+          echo "${{ steps.static_site.outputs.url }}"
           echo "### Frontend deployed" >> "$GITHUB_STEP_SUMMARY"
           echo "${{ steps.static_site.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
