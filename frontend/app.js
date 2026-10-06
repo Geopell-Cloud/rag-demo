@@ -4,8 +4,8 @@ const FUNCTION_KEY = "REPLACE_WITH_FUNCTION_KEY"; // function-level auth key
 const EXAMPLE_QUESTIONS = [
   "What is RAG?",
   "List some common RAG architectures.",
-  "Provide reasons why someone would use RAG.",
-  "What are some common use cases for RAG?",
+  "Describe the DevOps lifecyle.",
+  "What is the difference between RAG and DevOps?",
 ];
 
 const log = document.getElementById("log");

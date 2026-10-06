@@ -284,7 +284,7 @@ jobs:
             --query "primaryEndpoints.web" -o tsv)
           echo "url=${url%/}" >> "$GITHUB_OUTPUT"
 
-      - name: Allow frontend origin via CORS on Function App
+      - name: Allow Frontend Origin via CORS on Function App
         run: |
           az functionapp cors add \
             --name "${{ needs.get-endpoints.outputs.function_app_name }}" \
