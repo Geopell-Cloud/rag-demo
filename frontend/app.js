@@ -7,7 +7,7 @@ const EXAMPLE_QUESTIONS = [
   "Provide reasons why someone would use RAG.",
   "What are some common use cases for RAG?",
   "What is DevOps?",
-  "Describe the DevOps lifecycle?",
+  "Describe the DevOps lifecycle.",
 ];
 
 const log = document.getElementById("log");
