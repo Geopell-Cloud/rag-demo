@@ -239,13 +239,27 @@ jobs:
           echo "key=$key" >> "$GITHUB_OUTPUT"
 
       - name: Enable Static Website Hosting on Storage Account
+        id: static_site
         run: |
+          set -euo pipefail
           az storage blob service-properties update \
             --account-name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
             --auth-mode login \
             --static-website \
             --index-document index.html \
             --404-document index.html
+
+          url=$(az storage account show \
+            --name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
+            --query "primaryEndpoints.web" -o tsv)
+          echo "url=${url%/}" >> "$GITHUB_OUTPUT"
+
+      - name: Allow frontend origin via CORS on Function App
+        run: |
+          az functionapp cors add \
+            --name "${{ needs.get-endpoints.outputs.function_app_name }}" \
+            --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
+            --allowed-origins "${{ steps.static_site.outputs.url }}"
 
       - name: Template Frontend Config and Upload to $web Container
         env:
@@ -273,9 +287,6 @@ jobs:
 
       - name: Show Frontend URL
         run: |
-          url=$(az storage account show \
-            --name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
-            --query "primaryEndpoints.web" -o tsv)
-          echo "Frontend URL: $url"
+          echo "Frontend URL: ${{ steps.static_site.outputs.url }}"
           echo "### Frontend deployed" >> "$GITHUB_STEP_SUMMARY"
-          echo "$url" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.static_site.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
