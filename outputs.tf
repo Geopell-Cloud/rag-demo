@@ -22,3 +22,7 @@ output "function_app_name" {
 output "resource_group_name" {
   value = data.azurerm_resource_group.rg.name
 }
+
+output "foundry_resource_group_name" {
+  value = data.azurerm_cognitive_account.rag_shared_foundry.resource_group_name
+}

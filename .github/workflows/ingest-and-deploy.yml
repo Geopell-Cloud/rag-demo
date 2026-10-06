@@ -30,6 +30,7 @@ jobs:
       storage_account_name: ${{ steps.tf.outputs.storage_account_name }}
       function_app_name: ${{ steps.tf.outputs.function_app_name }}
       resource_group_name: ${{ steps.tf.outputs.resource_group_name }}
+      foundry_resource_group_name: ${{ steps.tf.outputs.foundry_resource_group_name }}
 
     env:
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -94,6 +95,7 @@ jobs:
             echo "storage_account_name=$(get storage_account_name)"
             echo "function_app_name=$(get function_app_name)"
             echo "resource_group_name=$(get resource_group_name)"
+            echo "foundry_resource_group_name=$(get foundry_resource_group_name)"
           } >> "$GITHUB_OUTPUT"
 
   # ------------------------------------------------------------------
@@ -201,7 +203,7 @@ jobs:
           openai_name=$(echo "${{ needs.get-endpoints.outputs.openai_endpoint }}" | sed -E 's#https://([^.]+)\..*#\1#')
           openai_key=$(az cognitiveservices account keys list \
             --name "$openai_name" \
-            --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
+            --resource-group "${{ needs.get-endpoints.outputs.foundry_resource_group_name }}" \
             --query key1 -o tsv)
 
           # Mask them in logs
