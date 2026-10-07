@@ -69,7 +69,13 @@ def main() -> None:
     for blob in container.list_blobs():
         print(f"Processing {blob.name} ...")
         blob_bytes = container.download_blob(blob.name).readall()
-        text = extract_text(blob_bytes)
+
+        # Plain-text formats don't need Document Intelligence (and it
+        # doesn't accept them), so decode them directly.
+        if blob.name.lower().endswith((".txt", ".md")):
+            text = blob_bytes.decode("utf-8", errors="replace")
+        else:
+            text = extract_text(blob_bytes)
 
         for chunk in chunk_text(text):
             print(f"Using embedding deployment: '{EMBEDDING_DEPLOYMENT}'")
