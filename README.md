@@ -8,19 +8,21 @@ It uses Azure OpenAI Service to access GPT models, Azure AI Search for data inde
 
 ```
 backend/
-  function_app.py   Azure Function (Python v2 model) exposes POST /api/chat
+  function_app.py                     # Azure Function (Python v2 model) exposes POST /api/chat
   host.json
   rag.py
   requirements-backend.txt
-data/
+data/                                 # Sample documents
+  DevOps_Overview.pdf
+  Geopell-Cloud-Knowledge-Base.txt
   RAG_Overview.pdf
 frontend/
   app.js
   index.html
   style.css
 ingestion/
-  create_index.py   Builds search index
-  ingest.py         Loads documents
+  create_index.py                     # Builds search index
+  ingest.py                           # Loads documents
   requirements-ingest.txt
 ```
 
@@ -43,21 +45,21 @@ ingestion/
    host it from the Storage Account's static website. It just calls the
    Function App.
 
-All Azure auth uses `DefaultAzureCredential`, so it works with the Linux
-Function App's **system-assigned managed identity** — no keys or secrets
-in code or settings.
+All Azure auth uses `DefaultAzureCredential` and `AzureKeyCredential`.
 
-## GitHub Actions: automated ingest + deploy
+## GitHub Actions: read Terraform outputs + automated ingest + automated deploy + setup frontend
 
 `.github/workflows/ingest-and-deploy.yml` runs the entire ingest-and-deploy
 cycle when documents are pushed into the `data/` folder at the repo root,
-or the backend changes. It has two jobs:
+or the backend changes:
 
-1. **`ingest`** — uploads everything from `data/` to Storage Account's container, then runs `create_index.py` and `ingest.py`
+1. **`get-endpoints`** — Captures the endpoints and resource names from Terraform resource outputs to use throughout workflow
+2. **`ingest`** — uploads everything from `data/` to Storage Account's container, then runs `create_index.py` and `ingest.py`
    against it.
-2. **`deploy-function-app`** — packages `backend/` (installs
+3. **`deploy-function-app`** — packages `backend/` (installs
    dependencies into `.python_packages/lib/site-packages`) and deploys it with
    `Azure/functions-action`, then sets the required app settings.
+4. **`deploy-frontend`** — deploys and sets up the frontend, including fetching the function app key, enabling hosting on storage account, allowing website URL via CORS, and copying frontend files to storage account.
 
 ### 1. Put documents in `data/`
 
@@ -73,6 +75,7 @@ repo/
 ```
 
 Any file type Document Intelligence's `prebuilt-read` model supports (PDF, DOCX, images, etc.) works here.
+This app also supports .txt and .md files.
 
 ### 2. Set up OIDC federated auth for GitHub Actions
 
@@ -99,12 +102,6 @@ Settings → Secrets and variables → Actions → New repository secret:
 | `AZURE_CLIENT_ID` | app registration's client ID |
 | `AZURE_TENANT_ID` | tenant ID |
 | `AZURE_SUBSCRIPTION_ID` | subscription ID |
-| `AZURE_STORAGE_ACCOUNT_NAME` | storage account name (name only, no URL) |
-| `AZURE_SEARCH_ENDPOINT` | `https://<search-service>.search.windows.net` |
-| `AZURE_DOCUMENTINTELLIGENCE_ENDPOINT` | `https://<documentintelligence-resource>.cognitiveservices.azure.com` |
-| `AZURE_OPENAI_ENDPOINT` | `https://<openai-resource>.openai.azure.com` |
-| `AZURE_FUNCTIONAPP_NAME` | Function App's name |
-| `AZURE_RESOURCE_GROUP` | resource group containing the Function App |
 
 ### 5. Run the workflow
 
