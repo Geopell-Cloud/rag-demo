@@ -1,0 +1,3 @@
+azure-functions
+azure-search-documents>=11.5.1
+openai>=1.40.0

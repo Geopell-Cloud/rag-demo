@@ -23,6 +23,11 @@ data "azurerm_resource_group" "rg" {
   name = "rag-demo-rg"
 }
 
+data "azurerm_cognitive_account" "rag_shared_foundry" {
+  name                = "paschalogbannu-6488-resource"
+  resource_group_name = "ai-rcm-dev"
+}
+
 # Ensures unique CAF compliant name for resources
 module "naming" {
   source  = "Azure/naming/azurerm"
@@ -44,22 +49,14 @@ resource "azurerm_storage_container" "rag_stcont" {
   container_access_type = "private"
 }
 
-resource "azurerm_cognitive_account" "rag_cogacc_openai" {
-  name                = "cog-acc-openai-rag"
-  location            = "westus3"
-  resource_group_name = data.azurerm_resource_group.rg.name
-  kind                = "OpenAI"
-  sku_name            = "S0"
-}
-
-resource "azurerm_cognitive_deployment" "rag_cogdeploy_openai" {
-  name                 = "cog-deploy-openai-rag"
-  cognitive_account_id = azurerm_cognitive_account.rag_cogacc_openai.id
+resource "azurerm_cognitive_deployment" "rag_cogdeploy_chat" {
+  name                 = "rag-cog-deploy-chat"
+  cognitive_account_id = data.azurerm_cognitive_account.rag_shared_foundry.id
 
   model {
     format  = "OpenAI"
-    name    = "gpt-5.1"
-    version = "2025-11-13"
+    name    = "gpt-5.4-mini"
+    version = "2026-03-17"
   }
 
   sku {
@@ -68,17 +65,24 @@ resource "azurerm_cognitive_deployment" "rag_cogdeploy_openai" {
   }
 }
 
-resource "azurerm_cognitive_account" "rag_cogacc_docintell" {
-  name                          = "cog-acc-docintell-rag-${module.naming.cognitive_account.name_unique}"
-  location                      = "westus3"
-  resource_group_name           = data.azurerm_resource_group.rg.name
-  kind                          = "FormRecognizer"
-  sku_name                      = "S0"
-  public_network_access_enabled = true
+resource "azurerm_cognitive_deployment" "rag_cogdeploy_embed" {
+  name                 = "rag-cog-deploy-embed"
+  cognitive_account_id = data.azurerm_cognitive_account.rag_shared_foundry.id
+
+  model {
+    format  = "OpenAI"
+    name    = "text-embedding-3-small"
+    version = "1"
+  }
+
+  sku {
+    name     = "GlobalStandard"
+    capacity = 1
+  }
 }
 
 resource "azurerm_service_plan" "rag_srvplan" {
-  name                = "srvplan-rag"
+  name                = "rag-srvplan"
   resource_group_name = data.azurerm_resource_group.rg.name
   location            = "westus2"
   os_type             = "Linux"
@@ -86,7 +90,7 @@ resource "azurerm_service_plan" "rag_srvplan" {
 }
 
 resource "azurerm_linux_function_app" "rag_funapp" {
-  name                       = "funapp-rag"
+  name                       = "rag-funapp"
   resource_group_name        = data.azurerm_resource_group.rg.name
   location                   = azurerm_service_plan.rag_srvplan.location
   storage_account_name       = azurerm_storage_account.rag_stacc.name
@@ -106,38 +110,12 @@ resource "azurerm_linux_function_app" "rag_funapp" {
 }
 
 resource "azurerm_search_service" "rag_search" {
-  name                = "azure-search-rag-${module.naming.search_service.name_unique}"
+  name                = "rag-${module.naming.search_service.name_unique}"
   resource_group_name = data.azurerm_resource_group.rg.name
   location            = data.azurerm_resource_group.rg.location
   sku                 = "basic"
+
+  # Configures authOptions.aadOrApiKey
+  local_authentication_enabled = true
+  authentication_failure_mode  = "http403"
 }
-
-data "azurerm_client_config" "current" {}
-
-resource "azurerm_key_vault" "rag_kv" {
-  name                       = "kv-rag"
-  location                   = data.azurerm_resource_group.rg.location
-  resource_group_name        = data.azurerm_resource_group.rg.name
-  rbac_authorization_enabled = false
-  tenant_id                  = data.azurerm_client_config.current.tenant_id
-  sku_name                   = "standard"
-  purge_protection_enabled   = false
-}
-
-# resource "azurerm_ai_foundry" "rag_hub" {
-#   name                = "foundry-hub-rag"
-#   location            = data.azurerm_resource_group.rg.location
-#   resource_group_name = data.azurerm_resource_group.rg.name
-#   storage_account_id  = azurerm_storage_account.rag_stacc.id
-#   key_vault_id        = azurerm_key_vault.rag_kv.id
-
-#   identity {
-#     type = "SystemAssigned"
-#   }
-# }
-
-# resource "azurerm_ai_foundry_project" "rag_project" {
-#   name               = "foundry-project-rag"
-#   location           = data.azurerm_resource_group.rg.location
-#   ai_services_hub_id = azurerm_ai_foundry.rag_hub.id
-# }

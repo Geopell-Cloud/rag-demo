@@ -1,9 +1,11 @@
 # Local directory for Terraform clones and plugins
 .terraform/
+.DS_Store
 
 # State files
 *.tfstate
 *.tfstate.*
+.terraform.lock.hcl
 
 # Variable value files
 *.tfvars

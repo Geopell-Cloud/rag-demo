@@ -1,0 +1,323 @@
+name: Ingest Data and Deploy RAG App
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_STORAGE_ACCOUNT: ragstoragedevstqsfd
+  AZURE_STORAGE_CONTAINER: rag-container
+  AZURE_SEARCH_INDEX: rag-index
+  AZURE_OPENAI_CHAT_DEPLOYMENT: gpt-5.4-mini
+  AZURE_OPENAI_EMBEDDING_DEPLOYMENT: text-embedding-3-small
+
+jobs:
+  # ------------------------------------------------------------------
+  # Reads endpoints and resource names from Terraform outputs
+  # ------------------------------------------------------------------
+  get-endpoints:
+    name: "Terraform Endpoints and Resource Names"
+    runs-on: ubuntu-latest
+    environment: dev
+
+    outputs:
+      search_endpoint: ${{ steps.tf.outputs.search_endpoint }}
+      docintel_endpoint: ${{ steps.tf.outputs.docintel_endpoint }}
+      openai_endpoint: ${{ steps.tf.outputs.openai_endpoint }}
+      storage_account_name: ${{ steps.tf.outputs.storage_account_name }}
+      function_app_name: ${{ steps.tf.outputs.function_app_name }}
+      resource_group_name: ${{ steps.tf.outputs.resource_group_name }}
+      foundry_resource_group_name: ${{ steps.tf.outputs.foundry_resource_group_name }}
+
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_USE_OIDC: "true"  # uses OIDC instead of client secret
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      TF_VAR_azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+      TF_VAR_azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+      TF_VAR_azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false   # keeps `terraform output` stdout clean
+
+      - name: Initialize Terraform
+        run: terraform init
+
+      - name: Read Terraform Outputs
+        id: tf
+        run: |
+          set -euo pipefail
+
+          get() {
+            local val
+            val=$(terraform output -raw "$1")
+            if [ -z "$val" ]; then
+              echo "::error::Terraform output '$1' is empty or missing"
+              exit 1
+            fi
+            echo "$val"
+          }
+
+          search_endpoint=$(get search_endpoint)
+          docintel_endpoint=$(get docintel_endpoint)
+          openai_endpoint=$(get openai_endpoint)
+
+          for u in "$search_endpoint" "$docintel_endpoint" "$openai_endpoint"; do
+            case "$u" in
+              https://*) ;;
+              *) echo "::error::Unexpected endpoint value in Terraform outputs"; exit 1 ;;
+            esac
+          done
+
+          # None of these are credentials, so they are not masked
+          {
+            echo "search_endpoint=${search_endpoint%/}"
+            echo "docintel_endpoint=${docintel_endpoint%/}"
+            echo "openai_endpoint=${openai_endpoint%/}"
+            echo "storage_account_name=$(get storage_account_name)"
+            echo "function_app_name=$(get function_app_name)"
+            echo "resource_group_name=$(get resource_group_name)"
+            echo "foundry_resource_group_name=$(get foundry_resource_group_name)"
+          } >> "$GITHUB_OUTPUT"
+
+  # ------------------------------------------------------------------
+  # Uploads ./data to Blob Storage, builds the index, and ingests
+  # ------------------------------------------------------------------
+  ingest:
+    name: "Create Index and Ingest Docs"
+    runs-on: ubuntu-latest
+    environment: dev
+    needs: get-endpoints
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Upload Data Folder to Blob Storage
+        run: |
+          az storage blob upload-batch \
+            --account-name "${{ env.AZURE_STORAGE_ACCOUNT }}" \
+            --destination "${{ env.AZURE_STORAGE_CONTAINER }}" \
+            --source "data" \
+            --auth-mode login \
+            --overwrite
+
+      - name: Setup Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ingestion Dependencies
+        working-directory: ./ingestion
+        run: pip install -r requirements-ingest.txt
+
+      - name: Create Search Index
+        working-directory: ./ingestion
+        env:
+          AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
+          EMBEDDING_DIMENSIONS: "1536"
+        run: python create_index.py
+
+      - name: Ingest Documents
+        working-directory: ./ingestion
+        env:
+          AZURE_STORAGE_ACCOUNT_URL: https://${{ needs.get-endpoints.outputs.storage_account_name }}.blob.core.windows.net
+          AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
+          AZURE_DOCUMENTINTELLIGENCE_ENDPOINT: ${{ needs.get-endpoints.outputs.docintel_endpoint }}
+          AZURE_OPENAI_ENDPOINT: ${{ needs.get-endpoints.outputs.openai_endpoint }}
+        run: python ingest.py
+
+  # ------------------------------------------------------------------
+  # Packages and deploys the Function App backend
+  # ------------------------------------------------------------------
+  deploy-function-app:
+    name: "Deploy Function App"
+    runs-on: ubuntu-latest
+    environment: dev
+    needs: [get-endpoints, ingest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: |
+          pip install -r requirements-backend.txt \
+            --target=".python_packages/lib/site-packages"
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Deploy to Azure Function App
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ needs.get-endpoints.outputs.function_app_name }}
+          package: ./backend
+          scm-do-build-during-deployment: false
+          enable-oryx-build: false
+
+      - name: Fetch Search and OpenAI API keys
+        id: data_keys
+        run: |
+          set -euo pipefail
+
+          search_name=$(echo "${{ needs.get-endpoints.outputs.search_endpoint }}" | sed -E 's#https://([^.]+)\..*#\1#')
+          search_key=$(az search admin-key show \
+            --service-name "$search_name" \
+            --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
+            --query primaryKey -o tsv)
+
+          openai_name=$(echo "${{ needs.get-endpoints.outputs.openai_endpoint }}" | sed -E 's#https://([^.]+)\..*#\1#')
+          openai_key=$(az cognitiveservices account keys list \
+            --name "$openai_name" \
+            --resource-group "${{ needs.get-endpoints.outputs.foundry_resource_group_name }}" \
+            --query key1 -o tsv)
+
+          # Mask them in logs
+          echo "::add-mask::$search_key"
+          echo "::add-mask::$openai_key"
+          echo "search_key=$search_key" >> "$GITHUB_OUTPUT"
+          echo "openai_key=$openai_key" >> "$GITHUB_OUTPUT"
+
+      - name: Configure App Settings
+        env:
+          AZURE_SEARCH_API_KEY: ${{ steps.data_keys.outputs.search_key }}
+          AZURE_OPENAI_API_KEY: ${{ steps.data_keys.outputs.openai_key }}
+        run: |
+          az functionapp config appsettings set \
+            --name "${{ needs.get-endpoints.outputs.function_app_name }}" \
+            --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
+            --settings \
+              AZURE_SEARCH_ENDPOINT="${{ needs.get-endpoints.outputs.search_endpoint }}" \
+              AZURE_SEARCH_INDEX="${{ env.AZURE_SEARCH_INDEX }}" \
+              AZURE_SEARCH_API_KEY="${AZURE_SEARCH_API_KEY}" \
+              AZURE_OPENAI_ENDPOINT="${{ needs.get-endpoints.outputs.openai_endpoint }}" \
+              AZURE_OPENAI_API_KEY="${AZURE_OPENAI_API_KEY}" \
+              AZURE_OPENAI_CHAT_DEPLOYMENT="${{ env.AZURE_OPENAI_CHAT_DEPLOYMENT }}" \
+              AZURE_OPENAI_EMBEDDING_DEPLOYMENT="${{ env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}" \
+            --output none
+
+  # ----------------------------------------------------------------
+  # Deploys the static frontend to the Storage Account's static 
+  # website ($web container), with API_BASE/FUNCTION_KEY templated 
+  # in at deploy time so no secrets live in the committed files
+  # ----------------------------------------------------------------
+  deploy-frontend:
+    name: "Deploy App Frontend"
+    runs-on: ubuntu-latest
+    environment: dev
+    needs: [get-endpoints, deploy-function-app]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Fetch Function Key
+        id: func_key
+        run: |
+          set -euo pipefail
+          key=$(az functionapp function keys list \
+            --name "${{ needs.get-endpoints.outputs.function_app_name }}" \
+            --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
+            --function-name chat \
+            --query default -o tsv)
+          if [ -z "$key" ]; then
+            echo "::error::Could not retrieve a function key for the 'chat' function"
+            exit 1
+          fi
+          # Mask it in logs even though it's also passed as a step output
+          echo "::add-mask::$key"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Enable Static Website Hosting on Storage Account
+        id: static_site
+        run: |
+          set -euo pipefail
+          az storage blob service-properties update \
+            --account-name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
+            --auth-mode login \
+            --static-website \
+            --index-document index.html \
+            --404-document index.html
+
+          url=$(az storage account show \
+            --name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
+            --query "primaryEndpoints.web" -o tsv)
+          echo "url=${url%/}" >> "$GITHUB_OUTPUT"
+
+      - name: Allow Frontend Origin via CORS on Function App
+        run: |
+          az functionapp cors add \
+            --name "${{ needs.get-endpoints.outputs.function_app_name }}" \
+            --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
+            --allowed-origins "${{ steps.static_site.outputs.url }}"
+
+      - name: Template Frontend Config and Upload to $web Container
+        env:
+          FUNCTION_KEY: ${{ steps.func_key.outputs.key }}
+        run: |
+          set -euo pipefail
+
+          # Work on a copy so the committed source files are never modified.
+          rm -rf /tmp/frontend-dist
+          cp -r ./frontend /tmp/frontend-dist
+
+          api_base="https://${{ needs.get-endpoints.outputs.function_app_name }}.azurewebsites.net/api"
+
+          sed -i \
+            -e "s#REPLACE_WITH_FUNCTION_APP_URL/api#${api_base}#g" \
+            -e "s#REPLACE_WITH_FUNCTION_KEY#${FUNCTION_KEY}#g" \
+            /tmp/frontend-dist/app.js
+
+          az storage blob upload-batch \
+            --account-name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
+            --destination '$web' \
+            --source /tmp/frontend-dist \
+            --auth-mode login \
+            --overwrite
+
+      - name: Show Frontend URL
+        run: |
+          echo "Frontend URL: "
+          echo "${{ steps.static_site.outputs.url }}"
+          echo "### Frontend deployed" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.static_site.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
