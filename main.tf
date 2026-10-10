@@ -109,6 +109,38 @@ resource "azurerm_linux_function_app" "rag_funapp" {
   }
 }
 
+resource "azurerm_linux_web_app" "rag_webapp" {
+  name                = "rag-webapp-streamlit"
+  resource_group_name = data.azurerm_resource_group.rg.name
+  location            = data.azurerm_resource_group.rg.location
+  service_plan_id     = azurerm_service_plan.rag_srvplan.id
+  https_only          = true
+
+  site_config {
+    always_on          = true
+    websockets_enabled = true   # Streamlit needs web sockets
+
+    application_stack {
+      python_version = "3.12"
+    }
+
+    app_command_line = "python -m streamlit run streamlit_app.py --server.port 8000 --server.address 0.0.0.0 --server.headless true"
+  }
+
+  app_settings = {
+    SCM_DO_BUILD_DURING_DEPLOYMENT = "true"   # lets App Service pip-install requirements-frontend.txt
+    WEBSITES_PORT                  = "8000"
+  }
+
+  # API_BASE and FUNCTION_KEY are set by the GitHub workflow after the Function App is deployed, so Terraform must not remove them.
+  lifecycle {
+    ignore_changes = [
+      app_settings["API_BASE"],
+      app_settings["FUNCTION_KEY"],
+    ]
+  }
+}
+
 resource "azurerm_search_service" "rag_search" {
   name                = "rag-${module.naming.search_service.name_unique}"
   resource_group_name = data.azurerm_resource_group.rg.name

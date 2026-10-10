@@ -31,6 +31,7 @@ jobs:
       function_app_name: ${{ steps.tf.outputs.function_app_name }}
       resource_group_name: ${{ steps.tf.outputs.resource_group_name }}
       foundry_resource_group_name: ${{ steps.tf.outputs.foundry_resource_group_name }}
+      web_app_name: ${{ steps.tf.outputs.web_app_name }}
 
     env:
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -67,18 +68,26 @@ jobs:
           set -euo pipefail
 
           get() {
-            local val
-            val=$(terraform output -raw "$1")
-            if [ -z "$val" ]; then
-              echo "::error::Terraform output '$1' is empty or missing"
+            local name="$1" val
+            if ! val=$(terraform output -raw "$name" 2>&1); then
+              echo "::error::terraform output -raw $name failed: $val"
               exit 1
             fi
-            echo "$val"
+            if [ -z "$val" ]; then
+              echo "::error::Terraform output '$name' is empty"
+              exit 1
+            fi
+            printf '%s' "$val"
           }
 
           search_endpoint=$(get search_endpoint)
           docintel_endpoint=$(get docintel_endpoint)
           openai_endpoint=$(get openai_endpoint)
+          storage_account_name=$(get storage_account_name)
+          function_app_name=$(get function_app_name)
+          resource_group_name=$(get resource_group_name)
+          foundry_resource_group_name=$(get foundry_resource_group_name)
+          web_app_name=$(get web_app_name)
 
           for u in "$search_endpoint" "$docintel_endpoint" "$openai_endpoint"; do
             case "$u" in
@@ -96,6 +105,7 @@ jobs:
             echo "function_app_name=$(get function_app_name)"
             echo "resource_group_name=$(get resource_group_name)"
             echo "foundry_resource_group_name=$(get foundry_resource_group_name)"
+            echo "web_app_name=${web_app_name}"
           } >> "$GITHUB_OUTPUT"
 
   # ------------------------------------------------------------------
@@ -268,56 +278,33 @@ jobs:
           echo "::add-mask::$key"
           echo "key=$key" >> "$GITHUB_OUTPUT"
 
-      - name: Enable Static Website Hosting on Storage Account
-        id: static_site
-        run: |
-          set -euo pipefail
-          az storage blob service-properties update \
-            --account-name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
-            --auth-mode login \
-            --static-website \
-            --index-document index.html \
-            --404-document index.html
-
-          url=$(az storage account show \
-            --name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
-            --query "primaryEndpoints.web" -o tsv)
-          echo "url=${url%/}" >> "$GITHUB_OUTPUT"
-
-      - name: Allow Frontend Origin via CORS on Function App
-        run: |
-          az functionapp cors add \
-            --name "${{ needs.get-endpoints.outputs.function_app_name }}" \
-            --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
-            --allowed-origins "${{ steps.static_site.outputs.url }}"
-
-      - name: Template Frontend Config and Upload to $web Container
+      - name: Configure Web App Settings
         env:
           FUNCTION_KEY: ${{ steps.func_key.outputs.key }}
         run: |
-          set -euo pipefail
+          az webapp config appsettings set \
+            --name "${{ needs.get-endpoints.outputs.web_app_name }}" \
+            --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
+            --settings \
+              API_BASE="https://${{ needs.get-endpoints.outputs.function_app_name }}.azurewebsites.net/api" \
+              FUNCTION_KEY="${FUNCTION_KEY}" \
+              SCM_DO_BUILD_DURING_DEPLOYMENT="true" \
+              WEBSITES_PORT="8000" \
+            --output none
 
-          # Work on a copy so the committed source files are never modified.
-          rm -rf /tmp/frontend-dist
-          cp -r ./frontend /tmp/frontend-dist
-
-          api_base="https://${{ needs.get-endpoints.outputs.function_app_name }}.azurewebsites.net/api"
-
-          sed -i \
-            -e "s#REPLACE_WITH_FUNCTION_APP_URL/api#${api_base}#g" \
-            -e "s#REPLACE_WITH_FUNCTION_KEY#${FUNCTION_KEY}#g" \
-            /tmp/frontend-dist/app.js
-
-          az storage blob upload-batch \
-            --account-name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
-            --destination '$web' \
-            --source /tmp/frontend-dist \
-            --auth-mode login \
-            --overwrite
+      - name: Deploy Streamlit app to App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ needs.get-endpoints.outputs.web_app_name }}
+          package: ./frontend
 
       - name: Show Frontend URL
         run: |
+          host=$(az webapp show \
+            --name "${{ needs.get-endpoints.outputs.web_app_name }}" \
+            --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
+            --query defaultHostName -o tsv)
           echo "Frontend URL: "
-          echo "${{ steps.static_site.outputs.url }}"
+          echo "https://${host}"
           echo "### Frontend deployed" >> "$GITHUB_STEP_SUMMARY"
-          echo "${{ steps.static_site.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://${host}" >> "$GITHUB_STEP_SUMMARY"
