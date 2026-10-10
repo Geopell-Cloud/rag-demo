@@ -18,12 +18,12 @@ API_BASE = os.environ.get("API_BASE", "").rstrip("/")
 FUNCTION_KEY = os.environ.get("FUNCTION_KEY", "")
 
 EXAMPLE_QUESTIONS = [
+    "What is the Geopell Cloud DevOps, Cloud & AI Engineering Training?",
     "What is RAG?",
-    "List some common RAG architectures.",
-    "Provide reasons why someone would use RAG.",
-    "What are some common use cases for RAG?",
-    "What is DevOps?",
+    "Please provide information on the duration and schedule of Geopell Cloud DevOps, Cloud & AI Training.",
     "Describe the DevOps lifecycle.",
+    "What is DevOps?",
+    "What are some common use cases for RAG?",
 ]
 
 st.set_page_config(page_title="RAG Demo", page_icon="💬", layout="centered")
@@ -39,6 +39,9 @@ st.markdown(
         display: inline-block; width: 10px; height: 10px; margin-right: 10px;
         border-radius: 50%; background: #4cd964;
       }
+      [data-testid="stCaptionContainer"] {
+        text-align: center;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -87,7 +90,7 @@ if st.session_state.pending:
 
 # Empty state with example questions
 if not st.session_state.messages and not prompt:
-    st.markdown("### Ask a question or try one of these examples")
+    st.markdown("<h3 style='text-align: center;'>Ask a question or try one of these examples</h3>", unsafe_allow_html=True)
     st.caption("Answers are from the documents that are indexed from a data source, with citations.")
     cols = st.columns(2)
     for i, q in enumerate(EXAMPLE_QUESTIONS):
