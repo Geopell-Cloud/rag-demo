@@ -32,16 +32,23 @@ st.markdown(
     """
     <style>
       .app-header {
-        background: #123f58; color: white; padding: 12px 20px;
-        border-radius: 6px; font-size: 1.1rem; font-weight: 600;
+        background: #123f58; color: white; padding: 15px 20px; height: 70px;
+        border-radius: 6px; font-size: 1.5rem; font-weight: 600;
       }
       .app-header .dot {
         display: inline-block; width: 10px; height: 10px; margin-right: 10px;
         border-radius: 50%; background: #4cd964;
       }
-      [data-testid="stCaptionContainer"] {
+      [data-testid="stMarkdownContainer"] h3, [data-testid="stCaptionContainer"] {
         text-align: center;
-    }
+      }
+      [data-testid="stColumn"] p {
+        word-break: break-word;
+        white-space: normal;
+      }
+      [data-testid="stColumn"] button {
+        height: 70px;
+      }
     </style>
     """,
     unsafe_allow_html=True,
@@ -90,7 +97,7 @@ if st.session_state.pending:
 
 # Empty state with example questions
 if not st.session_state.messages and not prompt:
-    st.markdown("<h3 style='text-align: center;'>Ask a question or try one of these examples</h3>", unsafe_allow_html=True)
+    st.markdown("<h3>Ask a question or try one of these examples</h3>", unsafe_allow_html=True)
     st.caption("Answers are from the documents that are indexed from a data source, with citations.")
     cols = st.columns(2)
     for i, q in enumerate(EXAMPLE_QUESTIONS):
