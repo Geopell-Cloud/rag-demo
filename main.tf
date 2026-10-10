@@ -128,7 +128,7 @@ resource "azurerm_linux_web_app" "rag_webapp" {
   }
 
   app_settings = {
-    SCM_DO_BUILD_DURING_DEPLOYMENT = "true"   # lets App Service pip-install requirements-frontend.txt
+    SCM_DO_BUILD_DURING_DEPLOYMENT = "true"   # lets App Service pip-install requirements.txt
     WEBSITES_PORT                  = "8000"
   }
 

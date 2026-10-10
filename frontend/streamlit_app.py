@@ -4,7 +4,7 @@ Calls the Function App's POST /api/chat endpoint server-side, so the
 function key never reaches the browser.
 
 To run locally:
-    pip install -r requirements-frontend.txt
+    pip install -r requirements.txt
     export API_BASE="https://<function-app>.azurewebsites.net/api"
     export FUNCTION_KEY="<function key>"
     streamlit run streamlit_app.py
