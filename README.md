@@ -10,16 +10,14 @@ It uses Azure OpenAI Service to access GPT models, Azure AI Search for data inde
 backend/
   function_app.py                     # Azure Function (Python v2 model) exposes POST /api/chat
   host.json
-  rag.py
+  agent.py
   requirements-backend.txt
 data/                                 # Sample documents
   DevOps_Overview.pdf
   Geopell-Cloud-Knowledge-Base.txt
   RAG_Overview.pdf
 frontend/
-  app.js
-  index.html
-  style.css
+  streamlit_app.py                    # Streamlit chat UI
 ingestion/
   create_index.py                     # Builds search index
   ingest.py                           # Loads documents
@@ -36,13 +34,15 @@ ingestion/
    uploads the chunks to the index.
 
 2. **Chat (the Function App):**
-   `POST /api/chat` embeds the user's question, does a hybrid search against the
-   index, stuffs the top results into a prompt, and calls Azure OpenAI
-   chat deployment. Returns `{ answer, sources }`.
+   `POST /api/chat` runs an agent (`agent.py`): an Azure OpenAI tool-calling
+   loop with two tools, `search_documents` (hybrid search, optionally limited
+   to one file) and `list_sources`. The model decides which tools to call and
+   how many times (up to `AGENT_MAX_STEPS`, default 5), then answers with
+   citations. Returns `{ answer, sources, steps }`, where `steps` is the list
+   of tool calls the agent made.
 
 3. **Frontend:**
-   `streamlit_app.py` is a Streamlit app hosted on a Linux App Service. It
-   calls the Function App's `/api/chat` endpoint server-side, so the
+   `streamlit_app.py` is a Streamlit app hosted on a Linux App Service. It calls the Function App's `/api/chat` endpoint server-side, so the
    function key stays in an app setting and never reaches the browser.
 
 All Azure auth uses `DefaultAzureCredential` and `AzureKeyCredential`.
@@ -59,7 +59,8 @@ or the backend changes:
 3. **`deploy-function-app`** — packages `backend/` (installs
    dependencies into `.python_packages/lib/site-packages`) and deploys it with
    `Azure/functions-action`, then sets the required app settings.
-4. **`deploy-frontend`** — deploys and sets up the frontend, including fetching the function app key, enabling hosting on storage account, allowing website URL via CORS, and copying frontend files to storage account.
+4. **`deploy-frontend`** — deploys and sets up the Streamlit frontend, including fetching the function app key and configuring the settings 
+   for the web app.
 
 ### 1. Put documents in `data/`
 
@@ -68,6 +69,7 @@ repo/
   data/
     document-a.pdf
     document-b.docx
+    document-c.txt
   backend/
   ingestion/
   frontend/
@@ -108,6 +110,5 @@ Settings → Secrets and variables → Actions → New repository secret:
 ## Notes
 
 - Uses single chat endpoint
-- Uses hybrid (vector + keyword)
-  search
+- Uses hybrid (vector + keyword) search
 - Chunking is simple character-based splitting

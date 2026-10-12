@@ -3,7 +3,7 @@ import logging
 
 import azure.functions as func
 
-from rag import get_answer
+from agent import run_agent
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
@@ -22,8 +22,11 @@ def chat(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(json.dumps({"error": "'question' is required"}), status_code=400, mimetype="application/json")
 
     try:
-        answer, sources = get_answer(question, history)
-        return func.HttpResponse(json.dumps({"answer": answer, "sources": sources}), mimetype="application/json")
+        answer, sources, steps = run_agent(question, history)
+        return func.HttpResponse(
+            json.dumps({"answer": answer, "sources": sources, "steps": steps}),
+            mimetype="application/json",
+        )
     except Exception as exc:  # noqa: BLE001 - surface a clean 500 to the client
         logging.exception("chat endpoint failed")
         return func.HttpResponse(json.dumps({"error": str(exc)}), status_code=500, mimetype="application/json")
