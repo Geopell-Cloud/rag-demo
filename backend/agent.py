@@ -21,7 +21,7 @@ AZURE_OPENAI_API_KEY = os.environ["AZURE_OPENAI_API_KEY"]
 AZURE_OPENAI_CHAT_DEPLOYMENT = os.environ.get("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-5.4-mini")
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT = os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-small")
 AZURE_OPENAI_API_VERSION = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21")
-TOP_K = int(os.environ.get("RAG_TOP_K", "5"))
+TOP_K = int(os.environ.get("RAG_TOP_K", "10"))
 MAX_STEPS = int(os.environ.get("AGENT_MAX_STEPS", "5"))  # model calls that may use tools
 MAX_CHUNK_CHARS = 1500  # keep tool results small so the loop stays cheap
 
