@@ -26,3 +26,7 @@ output "resource_group_name" {
 output "foundry_resource_group_name" {
   value = data.azurerm_cognitive_account.rag_shared_foundry.resource_group_name
 }
+
+output "web_app_name" {
+  value = azurerm_linux_web_app.rag_webapp.name
+}

@@ -41,9 +41,9 @@ ingestion/
    chat deployment. Returns `{ answer, sources }`.
 
 3. **Frontend:**
-   `index.html` is a static page with no dependencies — open it directly or
-   host it from the Storage Account's static website. It just calls the
-   Function App.
+   `streamlit_app.py` is a Streamlit app hosted on a Linux App Service. It
+   calls the Function App's `/api/chat` endpoint server-side, so the
+   function key stays in an app setting and never reaches the browser.
 
 All Azure auth uses `DefaultAzureCredential` and `AzureKeyCredential`.
 
@@ -53,7 +53,7 @@ All Azure auth uses `DefaultAzureCredential` and `AzureKeyCredential`.
 cycle when documents are pushed into the `data/` folder at the repo root,
 or the backend changes:
 
-1. **`get-endpoints`** — Captures the endpoints and resource names from Terraform resource outputs to use throughout workflow
+1. **`get-endpoints`** — Captures the endpoints and resource names from Terraform resource outputs to use throughout workflow.
 2. **`ingest`** — uploads everything from `data/` to Storage Account's container, then runs `create_index.py` and `ingest.py`
    against it.
 3. **`deploy-function-app`** — packages `backend/` (installs
