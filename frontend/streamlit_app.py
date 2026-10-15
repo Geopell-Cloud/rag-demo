@@ -73,6 +73,8 @@ def ask(question: str) -> tuple[str, list[str], list[dict]]:
             json={"question": question, "history": history},
             timeout=200,  # agent runs make several model/search calls
         )
+        if resp.status_code != 200:
+            return f"Backend error {resp.status_code}: {resp.text[:300]}", [], []
         data = resp.json()
     except (requests.RequestException, ValueError) as exc:
         return f"Request failed: {exc}", [], []

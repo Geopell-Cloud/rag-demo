@@ -215,8 +215,7 @@ def run_agent(question: str, history: list[dict] | None = None) -> tuple[str, li
             model=AZURE_OPENAI_CHAT_DEPLOYMENT,
             messages=messages,
             tools=TOOLS,
-            tool_choice=tool_choice,
-            temperature=0.2,
+            tool_choice=tool_choice
         )
         msg = resp.choices[0].message
         if not msg.tool_calls:
@@ -255,7 +254,7 @@ def run_agent(question: str, history: list[dict] | None = None) -> tuple[str, li
             }
         )
         resp = openai_client.chat.completions.create(
-            model=AZURE_OPENAI_CHAT_DEPLOYMENT, messages=messages, temperature=0.2
+            model=AZURE_OPENAI_CHAT_DEPLOYMENT, messages=messages
         )
         answer = resp.choices[0].message.content or ""
 
