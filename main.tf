@@ -28,11 +28,6 @@ data "azurerm_cognitive_account" "rag_shared_foundry" {
   resource_group_name = "ai-rcm-dev"
 }
 
-data "azurerm_search_service" "rag_shared_search" {
-  name                = "azure-search-rcmai"
-  resource_group_name = "ai-rcm-dev"
-}
-
 # Ensures unique CAF compliant name for resources
 module "naming" {
   source  = "Azure/naming/azurerm"
@@ -150,4 +145,15 @@ resource "azurerm_linux_web_app" "rag_webapp" {
       app_settings["FUNCTION_KEY"],
     ]
   }
+}
+
+resource "azurerm_search_service" "azure_search" {
+  name                = "azure-search-${module.naming.search_service.name_unique}"
+  resource_group_name = data.azurerm_resource_group.rg.name
+  location            = data.azurerm_resource_group.rg.location
+  sku                 = "free"
+
+  # Configures authOptions.aadOrApiKey
+  local_authentication_enabled = true
+  authentication_failure_mode  = "http403"
 }
