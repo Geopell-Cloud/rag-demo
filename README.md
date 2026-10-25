@@ -4,6 +4,18 @@ This app demonstrates RAG (Retrieval Augmented Generation) using a Function App 
 
 It uses Azure OpenAI Service to access GPT models, Azure AI Search for data indexing and retrieval the app's backend is written in Python.
 
+## Sample Questions for RAG Demo Chat App
+
+You can ask the RAG chat app questions such as:
+
+* What is the Geopell Cloud DevOps, Cloud & AI Engineering Training?
+* What is RAG?
+* Please provide information on the duration and schedule for this DevOps Training.
+* Do you need previous experience to participate in DevOps Training?
+* What are some of the things I can learn from the training?
+* How do I register for the training?
+* Before joining DevOps Training, what are the requirements?
+
 ## Project Structure (for demo app)
 
 ```
@@ -18,6 +30,7 @@ data/                                 # Sample documents
   RAG_Overview.pdf
 frontend/
   streamlit_app.py                    # Streamlit chat UI
+  requirements.txt
 ingestion/
   create_index.py                     # Builds search index
   ingest.py                           # Loads documents
@@ -111,4 +124,4 @@ Settings → Secrets and variables → Actions → New repository secret:
 
 - Uses single chat endpoint
 - Uses hybrid (vector + keyword) search
-- Chunking is simple character-based splitting
+- Chunking is simple character-based splitting

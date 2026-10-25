@@ -20,7 +20,11 @@ FUNCTION_KEY = os.environ.get("FUNCTION_KEY", "")
 EXAMPLE_QUESTIONS = [
     "What is the Geopell Cloud DevOps, Cloud & AI Engineering Training?",
     "What is RAG?",
-    "Please provide information on the duration and schedule of Geopell Cloud DevOps, Cloud & AI Training.",
+    "Please provide information on the duration and schedule for this DevOps Training.",
+    "Do you need previous experience to participate in DevOps Training?",
+    "What are some of the things I can learn from the training?",
+    "How do I register for the training?",
+    "Before joining DevOps Training, what are the requirements?",
     "Describe the DevOps lifecycle.",
     "What is DevOps?",
     "What are some common use cases for RAG?",
