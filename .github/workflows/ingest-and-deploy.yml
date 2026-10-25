@@ -11,7 +11,7 @@ env:
   AZURE_STORAGE_ACCOUNT: ragstoragedevstqsfd
   AZURE_STORAGE_CONTAINER: rag-container
   AZURE_SEARCH_INDEX: rag-index
-  AZURE_OPENAI_CHAT_DEPLOYMENT: gpt-5.4-mini
+  AZURE_OPENAI_CHAT_DEPLOYMENT: gpt-5-nano
   AZURE_OPENAI_EMBEDDING_DEPLOYMENT: text-embedding-3-small
 
 jobs:
@@ -241,9 +241,9 @@ jobs:
             --output none
 
   # ----------------------------------------------------------------
-  # Deploys the static frontend to the Storage Account's static 
-  # website ($web container), with API_BASE/FUNCTION_KEY templated 
-  # in at deploy time so no secrets live in the committed files
+  # Deploys the Streamlit frontend to the App Service and
+  # API_BASE/FUNCTION_KEY are set as app settings, so nothing secret 
+  # is committed or sent to the browser
   # ----------------------------------------------------------------
   deploy-frontend:
     name: "Deploy App Frontend"
@@ -292,7 +292,7 @@ jobs:
               WEBSITES_PORT="8000" \
             --output none
 
-      - name: Deploy Streamlit app to App Service
+      - name: Deploy Streamlit App to App Service
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ needs.get-endpoints.outputs.web_app_name }}

@@ -20,7 +20,11 @@ FUNCTION_KEY = os.environ.get("FUNCTION_KEY", "")
 EXAMPLE_QUESTIONS = [
     "What is the Geopell Cloud DevOps, Cloud & AI Engineering Training?",
     "What is RAG?",
-    "Please provide information on the duration and schedule of Geopell Cloud DevOps, Cloud & AI Training.",
+    "Please provide information on the duration and schedule for this DevOps Training.",
+    "Do you need previous experience to participate in DevOps Training?",
+    "What are some of the things I can learn from the training?",
+    "How do I register for the training?",
+    "Before joining DevOps Training, what are the requirements?",
     "Describe the DevOps lifecycle.",
     "What is DevOps?",
     "What are some common use cases for RAG?",
@@ -59,26 +63,41 @@ if not API_BASE or not FUNCTION_KEY:
     st.stop()
 
 if "messages" not in st.session_state:
-    st.session_state.messages = []  # [{"role", "content", "sources"}]
+    st.session_state.messages = []  # [{"role", "content", "sources", "steps"}]
 if "pending" not in st.session_state:
     st.session_state.pending = None
 
 
-def ask(question: str) -> tuple[str, list[str]]:
+def ask(question: str) -> tuple[str, list[str], list[dict]]:
     history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages]
     try:
         resp = requests.post(
             f"{API_BASE}/chat",
             params={"code": FUNCTION_KEY},
             json={"question": question, "history": history},
-            timeout=120,
+            timeout=200,  # agent runs make several model/search calls
         )
+        if resp.status_code != 200:
+            return f"Backend error {resp.status_code}: {resp.text[:300]}", [], []
         data = resp.json()
     except (requests.RequestException, ValueError) as exc:
-        return f"Request failed: {exc}", []
+        return f"Request failed: {exc}", [], []
     if "error" in data:
-        return f"Error: {data['error']}", []
-    return data["answer"], data.get("sources", [])
+        return f"Error: {data['error']}", [], []
+    return data["answer"], data.get("sources", []), data.get("steps", [])
+
+
+def show_details(sources: list[str], steps: list[dict]) -> None:
+    """Render the agent's work (tool calls) and the sources it used."""
+    if steps:
+        with st.expander(f"Agent steps ({len(steps)})"):
+            for n, step in enumerate(steps, 1):
+                args = ", ".join(f"{k}={v!r}" for k, v in step["args"].items())
+                st.markdown(f"{n}. `{step['tool']}({args})` → {step['result']}")
+    if sources:
+        with st.expander("Sources"):
+            for src in sources:
+                st.markdown(f"- `{src}`")
 
 
 # Header with clear-chat button
@@ -98,33 +117,30 @@ if st.session_state.pending:
 # Empty state with example questions
 if not st.session_state.messages and not prompt:
     st.markdown("<h3>Ask a question or try one of these examples</h3>", unsafe_allow_html=True)
-    st.caption("Answers are from the documents that are indexed from a data source, with citations.")
-    cols = st.columns(2)
-    for i, q in enumerate(EXAMPLE_QUESTIONS):
-        if cols[i % 2].button(q, key=f"ex{i}", use_container_width=True):
-            st.session_state.pending = q
-            st.rerun()
+    st.caption("An agent searches your documents, decides what to look up and how often, and answers with citations.")
+    for row_start in range(0, len(EXAMPLE_QUESTIONS), 2):
+        cols = st.columns(2)
+        for offset, col in enumerate(cols):
+            i = row_start + offset
+            if i < len(EXAMPLE_QUESTIONS):
+                if col.button(EXAMPLE_QUESTIONS[i], key=f"example_{i}", use_container_width=True):
+                    st.session_state.pending = EXAMPLE_QUESTIONS[i]
+                    st.rerun()
 
 # Existing conversation
 for m in st.session_state.messages:
     with st.chat_message(m["role"]):
         st.write(m["content"])
-        if m.get("sources"):
-            with st.expander("Sources"):
-                for s in m["sources"]:
-                    st.markdown(f"- `{s}`")
+        show_details(m.get("sources", []), m.get("steps", []))
 
 # New turn
 if prompt:
     with st.chat_message("user"):
         st.write(prompt)
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            answer, sources = ask(prompt)
+        with st.spinner("Agent is planning, retrieving, evaluating, and refining..."):
+            answer, sources, steps = ask(prompt)
         st.write(answer)
-        if sources:
-            with st.expander("Sources"):
-                for s in sources:
-                    st.markdown(f"- `{s}`")
-    st.session_state.messages.append({"role": "user", "content": prompt, "sources": []})
-    st.session_state.messages.append({"role": "assistant", "content": answer, "sources": sources})
+        show_details(sources, steps)
+    st.session_state.messages.append({"role": "user", "content": prompt, "sources": [], "steps": []})
+    st.session_state.messages.append({"role": "assistant", "content": answer, "sources": sources, "steps": steps})

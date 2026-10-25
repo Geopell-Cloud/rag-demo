@@ -55,13 +55,13 @@ resource "azurerm_cognitive_deployment" "rag_cogdeploy_chat" {
 
   model {
     format  = "OpenAI"
-    name    = "gpt-5.4-mini"
-    version = "2026-03-17"
+    name    = "gpt-5-nano"
+    version = "2025-08-07"
   }
 
   sku {
     name = "GlobalStandard"
-    capacity = "5"
+    capacity = "1"
   }
 }
 
@@ -101,6 +101,9 @@ resource "azurerm_linux_function_app" "rag_funapp" {
     application_stack {
       python_version = "3.12"
     }
+
+    # Enforces 32-bit to stay compatible with F1 Service Plan
+    use_32_bit_worker = true
   }
 
   app_settings = {
@@ -117,8 +120,11 @@ resource "azurerm_linux_web_app" "rag_webapp" {
   https_only          = true
 
   site_config {
-    always_on          = true
+    always_on          = false
     websockets_enabled = true   # Streamlit needs web sockets
+
+    # Enforces 32-bit to stay compatible with F1 Service Plan
+    use_32_bit_worker = true
 
     application_stack {
       python_version = "3.12"
@@ -141,11 +147,11 @@ resource "azurerm_linux_web_app" "rag_webapp" {
   }
 }
 
-resource "azurerm_search_service" "rag_search" {
-  name                = "rag-${module.naming.search_service.name_unique}"
+resource "azurerm_search_service" "azure_search" {
+  name                = "azure-search-${module.naming.search_service.name_unique}"
   resource_group_name = data.azurerm_resource_group.rg.name
   location            = data.azurerm_resource_group.rg.location
-  sku                 = "basic"
+  sku                 = "free"
 
   # Configures authOptions.aadOrApiKey
   local_authentication_enabled = true

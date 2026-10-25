@@ -1,6 +1,6 @@
 output "search_endpoint" {
   # azurerm_search_service has no endpoint attribute, so builds it from resource name
-  value = "https://${azurerm_search_service.rag_search.name}.search.windows.net"
+  value = "https://${azurerm_search_service.azure_search.name}.search.windows.net"
 }
 
 output "docintel_endpoint" {
