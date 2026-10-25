@@ -86,7 +86,7 @@ resource "azurerm_service_plan" "rag_srvplan" {
   resource_group_name = data.azurerm_resource_group.rg.name
   location            = "westus2"
   os_type             = "Linux"
-  sku_name            = "F1"
+  sku_name            = "B1"
 }
 
 resource "azurerm_linux_function_app" "rag_funapp" {
