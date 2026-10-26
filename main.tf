@@ -98,6 +98,8 @@ resource "azurerm_linux_function_app" "rag_funapp" {
   service_plan_id            = azurerm_service_plan.rag_srvplan.id
 
   site_config {
+    always_on = true   # Needed to index uploaded document in the background with queue-triggered function
+
     application_stack {
       python_version = "3.12"
     }

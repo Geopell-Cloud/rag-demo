@@ -1,7 +1,7 @@
 name: Ingest Data and Deploy RAG App
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   id-token: write
@@ -127,6 +127,35 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           allow-no-subscriptions: true
 
+      - name: Fetch Keys for Indexing
+        id: keys
+        run: |
+          set -euo pipefail
+          RG="${{ needs.get-endpoints.outputs.resource_group_name }}"
+
+          search_name=$(echo "${{ needs.get-endpoints.outputs.search_endpoint }}" | sed -E 's#https://([^.]+)\..*#\1#')
+          search_key=$(az search admin-key show --service-name "$search_name" --resource-group "$RG" --query primaryKey -o tsv)
+
+          openai_name=$(echo "${{ needs.get-endpoints.outputs.openai_endpoint }}" | sed -E 's#https://([^.]+)\..*#\1#')
+          openai_key=$(az cognitiveservices account keys list --name "$openai_name" --resource-group "${{ needs.get-endpoints.outputs.foundry_resource_group_name }}" --query key1 -o tsv)
+
+          docintel_name=$(echo "${{ needs.get-endpoints.outputs.docintel_endpoint }}" | sed -E 's#https://([^.]+)\..*#\1#')
+          docintel_key=$(az cognitiveservices account keys list --name "$docintel_name" --resource-group "${{ needs.get-endpoints.outputs.foundry_resource_group_name }}" --query key1 -o tsv)
+
+          storage_cs=$(az storage account show-connection-string --name "${{ needs.get-endpoints.outputs.storage_account_name }}" --resource-group "$RG" --query connectionString -o tsv)
+
+          # Mask them in logs
+          echo "::add-mask::$search_key"
+          echo "::add-mask::$openai_key"
+          echo "::add-mask::$docintel_key"
+          echo "::add-mask::$storage_cs"
+          {
+            echo "search_key=$search_key"
+            echo "openai_key=$openai_key"
+            echo "docintel_key=$docintel_key"
+            echo "storage_cs=$storage_cs"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Upload Data Folder to Blob Storage
         run: |
           az storage blob upload-batch \
@@ -157,8 +186,14 @@ jobs:
         env:
           AZURE_STORAGE_ACCOUNT_URL: https://${{ needs.get-endpoints.outputs.storage_account_name }}.blob.core.windows.net
           AZURE_SEARCH_ENDPOINT: ${{ needs.get-endpoints.outputs.search_endpoint }}
-          AZURE_DOCUMENTINTELLIGENCE_ENDPOINT: ${{ needs.get-endpoints.outputs.docintel_endpoint }}
+          AZURE_SEARCH_API_KEY: ${{ steps.keys.outputs.search_key }}
           AZURE_OPENAI_ENDPOINT: ${{ needs.get-endpoints.outputs.openai_endpoint }}
+          AZURE_OPENAI_API_KEY: ${{ steps.keys.outputs.openai_key }}
+          AZURE_OPENAI_EMBEDDING_DEPLOYMENT: ${{ env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
+          AZURE_STORAGE_CONNECTION_STRING: ${{ steps.keys.outputs.storage_cs }}
+          AZURE_STORAGE_CONTAINER: ${{ env.AZURE_STORAGE_CONTAINER }}
+          AZURE_DOCUMENTINTELLIGENCE_ENDPOINT: ${{ needs.get-endpoints.outputs.docintel_endpoint }}
+          AZURE_DOCUMENTINTELLIGENCE_KEY: ${{ steps.keys.outputs.docintel_key }}
         run: python ingest.py
 
   # ------------------------------------------------------------------
@@ -199,7 +234,7 @@ jobs:
           scm-do-build-during-deployment: false
           enable-oryx-build: false
 
-      - name: Fetch Search and OpenAI API keys
+      - name: Fetch Search and OpenAI API Keys
         id: data_keys
         run: |
           set -euo pipefail
@@ -222,10 +257,33 @@ jobs:
           echo "search_key=$search_key" >> "$GITHUB_OUTPUT"
           echo "openai_key=$openai_key" >> "$GITHUB_OUTPUT"
 
+      - name: Fetch Storage Connection String and Document Intelligence Key
+        id: upload_secrets
+        run: |
+          set -euo pipefail
+          RG="${{ needs.get-endpoints.outputs.resource_group_name }}"
+
+          storage_cs=$(az storage account show-connection-string \
+            --name "${{ needs.get-endpoints.outputs.storage_account_name }}" \
+            --resource-group "$RG" --query connectionString -o tsv)
+          echo "::add-mask::$storage_cs"
+
+          docintel_name=$(echo "${{ needs.get-endpoints.outputs.docintel_endpoint }}" | sed -E 's#https://([^.]+)\..*#\1#')
+          docintel_key=$(az cognitiveservices account keys list \
+            --name "$docintel_name" --resource-group "${{ needs.get-endpoints.outputs.foundry_resource_group_name }}" --query key1 -o tsv)
+          echo "::add-mask::$docintel_key"
+
+          {
+            echo "storage_cs=$storage_cs"
+            echo "docintel_key=$docintel_key"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Configure App Settings
         env:
           AZURE_SEARCH_API_KEY: ${{ steps.data_keys.outputs.search_key }}
           AZURE_OPENAI_API_KEY: ${{ steps.data_keys.outputs.openai_key }}
+          AZURE_STORAGE_CONNECTION_STRING: ${{ steps.upload_secrets.outputs.storage_cs }}
+          AZURE_DOCUMENTINTELLIGENCE_KEY: ${{ steps.upload_secrets.outputs.docintel_key }}
         run: |
           az functionapp config appsettings set \
             --name "${{ needs.get-endpoints.outputs.function_app_name }}" \
@@ -238,6 +296,10 @@ jobs:
               AZURE_OPENAI_API_KEY="${AZURE_OPENAI_API_KEY}" \
               AZURE_OPENAI_CHAT_DEPLOYMENT="${{ env.AZURE_OPENAI_CHAT_DEPLOYMENT }}" \
               AZURE_OPENAI_EMBEDDING_DEPLOYMENT="${{ env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}" \
+              AZURE_STORAGE_CONNECTION_STRING="${AZURE_STORAGE_CONNECTION_STRING}" \
+              AZURE_STORAGE_CONTAINER="${{ env.AZURE_STORAGE_CONTAINER }}" \
+              AZURE_DOCUMENTINTELLIGENCE_ENDPOINT="${{ needs.get-endpoints.outputs.docintel_endpoint }}" \
+              AZURE_DOCUMENTINTELLIGENCE_KEY="${AZURE_DOCUMENTINTELLIGENCE_KEY}" \
             --output none
 
   # ----------------------------------------------------------------
@@ -274,7 +336,7 @@ jobs:
             echo "::error::Could not retrieve a function key for the 'chat' function"
             exit 1
           fi
-          # Mask it in logs even though it's also passed as a step output
+          # Mask it in logs
           echo "::add-mask::$key"
           echo "key=$key" >> "$GITHUB_OUTPUT"
 
