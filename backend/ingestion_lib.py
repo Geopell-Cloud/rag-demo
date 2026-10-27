@@ -4,20 +4,26 @@ Flow for a portal upload (large files never pass through an HTTP request):
   1. /api/upload-url  -> returns a short-lived SAS link to write one blob
   2. browser/Streamlit PUTs the file straight to Blob Storage
   3. /api/index       -> puts the blob name on the 'index-jobs' queue
-  4. queue trigger    -> index_blob() runs with the Function's longer timeout
+  4. queue trigger    -> process_queued_blob() indexes it with the Function's longer
+                         timeout and records progress in the blob's metadata
+  5. /api/status      -> the UI polls this until the file is indexed or failed
+
+Removing a document (delete_source) deletes its chunks from the index and the
+blob from the container.
 
 index_document() is the single indexing path. It replaces a file's chunks,
 never duplicates them: chunk IDs come from the file name and chunk number,
 and any older chunks for that file are deleted first.
 """
 import hashlib
+import logging
 import os
 import re
 from datetime import datetime, timedelta, timezone
 
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
-from azure.core.exceptions import ResourceExistsError
+from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.storage.blob import BlobSasPermissions, BlobServiceClient, generate_blob_sas
 from azure.storage.queue import QueueClient
 
@@ -29,6 +35,7 @@ DOCINTEL_ENDPOINT = os.environ["AZURE_DOCUMENTINTELLIGENCE_ENDPOINT"]
 DOCINTEL_KEY = os.environ["AZURE_DOCUMENTINTELLIGENCE_KEY"]
 EMBEDDING_DEPLOYMENT_NAME = os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-small")
 INDEX_QUEUE_NAME = "index-jobs"  # must match the queue_trigger in function_app.py
+MAX_ATTEMPTS = 3
 
 ALLOWED_EXTENSIONS = (".txt", ".pdf", ".docx")
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024
@@ -69,6 +76,10 @@ def create_upload_url(filename: str) -> dict:
 
 def enqueue_index(blob_name: str) -> str:
     name = check_extension(blob_name)
+    try:
+        _blob_service.get_blob_client(STORAGE_CONTAINER, name).set_blob_metadata({"index_status": "queued"})
+    except ResourceNotFoundError:
+        raise UploadError(f"{name} was not found in the container; upload it first") from None
     queue = QueueClient.from_connection_string(STORAGE_CONNECTION_STRING, INDEX_QUEUE_NAME)
     try:
         queue.create_queue()
@@ -177,3 +188,86 @@ def index_blob(blob_name: str) -> dict:
     if size > MAX_UPLOAD_BYTES:
         raise UploadError(f"{blob_name} is larger than 200 MB")
     return index_document(blob_name, client.download_blob().readall())
+
+
+# ---------------------------------------------------------------------------
+# Progress tracking, listing, and removal
+# ---------------------------------------------------------------------------
+
+def _ascii(value, limit: int = 200) -> str:
+    """Blob metadata values must be plain ASCII on one line."""
+    return re.sub(r"[^\x20-\x7E]", " ", str(value)).strip()[:limit] or "-"
+
+
+def _set_status(blob_name: str, status: str, **extra) -> None:
+    metadata = {"index_status": status}
+    metadata.update({f"index_{key}": _ascii(value) for key, value in extra.items()})
+    try:
+        _blob_service.get_blob_client(STORAGE_CONTAINER, blob_name).set_blob_metadata(metadata)
+    except ResourceNotFoundError:
+        pass
+
+
+def process_queued_blob(blob_name: str, attempt: int) -> dict:
+    """Queue worker entry point: index one blob and record its status.
+
+    Problems with the file itself (unreadable, no text) are final, so they are
+    recorded as 'failed' without retrying. Anything else is re-raised so the
+    queue retries; after MAX_ATTEMPTS the message moves to the poison queue.
+    """
+    blob = _blob_service.get_blob_client(STORAGE_CONTAINER, blob_name)
+    if not blob.exists():
+        logging.warning("%s no longer exists; skipping", blob_name)
+        return {"source": blob_name, "status": "missing", "chunks": 0}
+
+    _set_status(blob_name, "indexing")
+    try:
+        result = index_blob(blob_name)
+    except UploadError as exc:
+        _set_status(blob_name, "failed", error=exc)
+        return {"source": blob_name, "status": "failed", "error": str(exc)}
+    except Exception as exc:
+        _set_status(blob_name, "failed" if attempt >= MAX_ATTEMPTS else "retrying", error=exc)
+        raise
+    _set_status(blob_name, result["status"], chunks=result["chunks"])
+    return result
+
+
+def get_status(blob_name: str) -> dict:
+    """Indexing progress for one uploaded file, read from its blob metadata."""
+    try:
+        props = _blob_service.get_blob_client(STORAGE_CONTAINER, blob_name).get_blob_properties()
+    except ResourceNotFoundError:
+        return {"status": "missing", "chunks": None, "error": None}
+    meta = props.metadata or {}
+    chunks = meta.get("index_chunks", "")
+    return {
+        "status": meta.get("index_status", "unknown"),
+        "chunks": int(chunks) if chunks.isdigit() else None,
+        "error": meta.get("index_error"),
+    }
+
+
+def list_all_sources() -> list[dict]:
+    """Every source in the search index with its chunk count (up to 1000 files)."""
+    results = search_client.search(search_text="*", facets=["source,count:1000"], top=0)
+    facets = results.get_facets() or {}
+    sources = [{"source": f["value"], "chunks": f["count"]} for f in facets.get("source", [])]
+    return sorted(sources, key=lambda item: item["source"].lower())
+
+
+def delete_source(name: str) -> dict:
+    """Remove a document everywhere: its chunks from the index, then its blob.
+
+    Safe to repeat: if one half already happened, the other still completes.
+    """
+    name = (name or "").strip()
+    if not name:
+        raise UploadError("A source name is required")
+    removed = _remove_existing_chunks(name)
+    blob_deleted = True
+    try:
+        _blob_service.get_blob_client(STORAGE_CONTAINER, name).delete_blob(delete_snapshots="include")
+    except ResourceNotFoundError:
+        blob_deleted = False
+    return {"source": name, "chunks_removed": removed, "blob_deleted": blob_deleted}

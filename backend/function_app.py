@@ -3,7 +3,7 @@ import logging
 
 import azure.functions as func
 
-from agent import list_sources, run_agent
+from agent import run_agent
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
@@ -66,19 +66,49 @@ def index(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.queue_trigger(arg_name="msg", queue_name="index-jobs", connection="AZURE_STORAGE_CONNECTION_STRING")
 def index_worker(msg: func.QueueMessage) -> None:
-    from ingestion_lib import index_blob
+    from ingestion_lib import process_queued_blob
 
     name = msg.get_body().decode("utf-8")
-    result = index_blob(name)
-    logging.info("indexed %s", result)
+
+    result = process_queued_blob(name, msg.dequeue_count)
+    logging.info("index job for %s: %s", name, result)
 
 
-@app.route(route="sources", methods=["GET"])
+@app.route(route="sources", methods=["GET", "DELETE"])
 def sources(req: func.HttpRequest) -> func.HttpResponse:
+    """GET lists indexed sources. DELETE ?name=<file> removes the chunks and the blob."""
+    if req.method == "DELETE":
+        try:
+            from ingestion_lib import UploadError, delete_source
+
+            return _json(delete_source(req.params.get("name", "")))
+        except UploadError as exc:
+            return _json({"error": str(exc)}, 400)
+        except Exception as exc:
+            logging.exception("delete failed")
+            return _json({"error": f"Could not remove the document: {exc}"}, 500)
+
     try:
-        return _json({"sources": list_sources()})
+        from ingestion_lib import list_all_sources
+
+        return _json({"sources": list_all_sources()})
     except Exception as exc:
         logging.exception("sources failed")
+        return _json({"error": str(exc)}, 500)
+
+
+@app.route(route="status", methods=["GET"])
+def status(req: func.HttpRequest) -> func.HttpResponse:
+    """Indexing progress for an uploaded file: ?blob=<file name>"""
+    blob = req.params.get("blob", "").strip()
+    if not blob:
+        return _json({"error": "'blob' is required"}, 400)
+    try:
+        from ingestion_lib import get_status
+
+        return _json(get_status(blob))
+    except Exception as exc:
+        logging.exception("status failed")
         return _json({"error": str(exc)}, 500)
 
 
