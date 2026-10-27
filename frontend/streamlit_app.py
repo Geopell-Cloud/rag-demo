@@ -44,34 +44,15 @@ st.markdown(
         display: inline-block; width: 10px; height: 10px; margin-right: 10px;
         border-radius: 50%; background: #4cd964;
       }
-
-      /* ---- Example-question buttons only (widget keys: example_0, example_1, ...) ---- */
-
-      /* Make the two columns in each example row stretch to the same height */
-      div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-example_"]) {
-        align-items: stretch !important;
+      [data-testid="stMarkdownContainer"] h3, [data-testid="stCaptionContainer"] {
+        text-align: center;
       }
-      div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-example_"]) > div[data-testid="stColumn"],
-      div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-example_"]) > div[data-testid="column"] {
-        display: flex; flex-direction: column;
+      [data-testid="stColumn"] p {
+        word-break: break-word;
+        white-space: normal;
       }
-      div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-example_"]) > div > div[data-testid="stVerticalBlock"] {
-        flex: 1 1 auto;
-      }
-
-      /* Pass the full height down to the button itself */
-      div[class*="st-key-example_"],
-      div[class*="st-key-example_"] .stButton {
-        height: 100%;
-      }
-      div[class*="st-key-example_"] button {
-        height: 100%; min-height: 3rem;
-      }
-
-      /* Wrap long labels instead of clipping or overflowing */
-      div[class*="st-key-example_"] button,
-      div[class*="st-key-example_"] button p {
-        white-space: normal; word-break: break-word; overflow-wrap: anywhere;
+      [data-testid="stColumn"] button {
+        height: 70px;
       }
     </style>
     """,
@@ -162,7 +143,7 @@ with st.sidebar:
         st.caption("No documents indexed yet.")
     else:
         for src in sources_list:
-            st.markdown(f"- `{src['source']}` ({src['chunks']} chunks)")
+            st.markdown(f"- `{src['source']}`")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []  # [{"role", "content", "sources", "steps"}]

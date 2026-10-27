@@ -21,12 +21,13 @@ from azure.core.exceptions import ResourceExistsError
 from azure.storage.blob import BlobSasPermissions, BlobServiceClient, generate_blob_sas
 from azure.storage.queue import QueueClient
 
-from agent import EMBEDDING_DEPLOYMENT_NAME, openai_client, search_client
+from agent import openai_client, search_client
 
 STORAGE_CONNECTION_STRING = os.environ["AZURE_STORAGE_CONNECTION_STRING"]
 STORAGE_CONTAINER = os.environ.get("AZURE_STORAGE_CONTAINER", "documents")
 DOCINTEL_ENDPOINT = os.environ["AZURE_DOCUMENTINTELLIGENCE_ENDPOINT"]
 DOCINTEL_KEY = os.environ["AZURE_DOCUMENTINTELLIGENCE_KEY"]
+EMBEDDING_DEPLOYMENT_NAME = os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-small")
 INDEX_QUEUE_NAME = "index-jobs"  # must match the queue_trigger in function_app.py
 
 ALLOWED_EXTENSIONS = (".txt", ".pdf", ".docx")
