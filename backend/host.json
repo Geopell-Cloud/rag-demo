@@ -11,7 +11,8 @@
   },
   "extensions": {
     "queues": {
-      "maxDequeueCount": 3
+      "maxDequeueCount": 3,
+      "messageEncoding": "none"
     }
   },
   "extensionBundle": {

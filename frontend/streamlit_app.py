@@ -223,7 +223,7 @@ with st.sidebar:
             name = src["source"]
             uid = hashlib.md5(name.encode("utf-8")).hexdigest()[:10]
             left, right = st.columns([4, 1])
-            left.markdown(f"**{_md_escape(name)}**")
+            left.markdown(f"{_md_escape(name)}")
             if right.button("**X**", key=f"rm_{uid}", use_container_width=True):
                 st.session_state.confirm_delete = name
                 pending = name
