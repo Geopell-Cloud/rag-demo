@@ -327,13 +327,12 @@ jobs:
         id: func_key
         run: |
           set -euo pipefail
-          key=$(az functionapp function keys list \
+          key=$(az functionapp keys list \
             --name "${{ needs.get-endpoints.outputs.function_app_name }}" \
             --resource-group "${{ needs.get-endpoints.outputs.resource_group_name }}" \
-            --function-name chat \
-            --query default -o tsv)
+            --query "functionKeys.default" -o tsv)
           if [ -z "$key" ]; then
-            echo "::error::Could not retrieve a function key for the 'chat' function"
+            echo "::error::Could not retrieve the host function key"
             exit 1
           fi
           # Mask it in logs
