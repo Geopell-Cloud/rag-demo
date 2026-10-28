@@ -41,12 +41,6 @@ def main() -> int:
             print(f"::error::Failed to index {blob.name}: {exc}")
             failed += 1
 
-    live = {blob.name for blob in container.list_blobs()}
-    for source in lib.indexed_source_names():
-        if source not in live:
-            removed = lib.remove_source(source)
-            print(f"Removed {source} from the index ({removed} chunks).")
-
     print(f"Done: {indexed} indexed, {unchanged} unchanged, {skipped} unsupported, {failed} failed.")
     return 1 if failed else 0
 
