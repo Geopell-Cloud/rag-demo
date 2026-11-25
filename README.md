@@ -1,8 +1,58 @@
 # RAG Demo Chat App — Azure OpenAI + Azure AI Search
 
-This app demonstrates RAG (Retrieval Augmented Generation) using a Function App and uploaded documents. 
+This app demonstrates Agentic RAG (Retrieval Augmented Generation) using a Function App and uploaded documents from storage account. 
 
-It uses Azure OpenAI Service to access GPT models, Azure AI Search for data indexing and retrieval the app's backend is written in Python.
+It uses Azure OpenAI Service to access GPT models and Azure AI Search for data indexing. The app's backend is written in Python.
+
+## How to Use RAG Demo Chat App
+
+### Flowchart
+
+```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    primaryColor: "#fee2e2"
+    primaryBorderColor: "#dc2626"
+    primaryTextColor: "#7f1d1d"
+    secondaryColor: "#fef2f2"
+    secondaryBorderColor: "#ef4444"
+    secondaryTextColor: "#991b1b"
+    tertiaryColor: "#fff1f2"
+    tertiaryBorderColor: "#e11d48"
+    tertiaryTextColor: "#881337"
+    lineColor: "#991b1b"
+    textColor: "#450a0a"
+    edgeLabelBackground: "#ffffff"
+    clusterBkg: "#fff5f5"
+    clusterBorder: "#fca5a5"
+---
+flowchart TD
+    subgraph Row1 [" "]
+        direction LR
+        A["`***Step 1:* Open the Streamlit app**<br>*The chat and sidebar loads.*`"] --> 
+        B["`***Step 2:* Choose a file to upload**<br>*The user picks a PDF, DOCX, or TXT file to add.*`"] -->
+        C["`***Step 3:* Click <i>Upload and Index Document</i>**<br>*The file is sent to storage account, then chunked and indexed in Azure AI Search.*`"]
+    end
+    subgraph Row2 [" "]
+        direction LR
+        D["`*Step 4:* **Document name appears under <i>Indexed Documents<i>**<br>*The sidebar lists the document and its chunk count.*`"] --> 
+        E["`***Step 5:* Select or type a question in the chat**<br>*The user asks something about their documents.*`"] --> 
+        F["`***Step 6:* The agent searches every document**<br>*Agentic RAG is used to plan and retrieve an answer with OpenAI GPT model until the agent decides whether it has enough evidence.*`"]
+    end
+    subgraph Row3 [" "]
+        direction LR
+        G["`***Step 7:* The app provides an answer with citations**<br>*The answer appears with the source files and the agent's steps.*`"] --> 
+        H["`***Step 8:* Remove document from the app <i>(Optional)<i>**<br>*The user clicks the **X** to remove a document from Azure AI Search index and storage account.*`"]
+    end
+    Row1 --> Row2
+    Row2 --> Row3
+    style Row1 fill:transparent,stroke:transparent
+    style Row2 fill:transparent,stroke:transparent
+    style Row3 fill:transparent,stroke:transparent
+```
+
 
 ## Sample Questions for RAG Demo Chat App
 
@@ -47,7 +97,7 @@ rag-demo/
 - **`create_index.py`** creates or updates the search index schema, including the `contentHash` field (helps prevent embedding and re-indexing the same document file source).
 - **`ingest.py`** indexes every supported blob in the storage container by calling the same `index_blob` code the portal uses. It skips unchanged files and reports indexed, unchanged, unsupported, and failed files.
 
-## How it works
+## More details about how it works
 
 ### Chat
 
