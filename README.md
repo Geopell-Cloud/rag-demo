@@ -33,24 +33,19 @@ flowchart TD
         direction LR
         A["`***Step 1:* Open the Streamlit app**<br>*The chat and sidebar loads.*`"] --> 
         B["`***Step 2:* Choose a file to upload**<br>*The user picks a PDF, DOCX, or TXT file to add.*`"] -->
-        C["`***Step 3:* Click <i>Upload and Index Document</i>**<br>*The file is sent to storage account, then chunked and indexed in Azure AI Search.*`"]
+        C["`***Step 3:* Click <i>Upload and Index Document</i>**<br>*The file is sent to storage account, then chunked and indexed in Azure AI Search.*`"] -->
+        D["`*Step 4:* **Document name appears under <i>Indexed Documents<i>**<br>*The sidebar lists the document and its chunk count.*`"]
     end
     subgraph Row2 [" "]
         direction LR
-        D["`*Step 4:* **Document name appears under <i>Indexed Documents<i>**<br>*The sidebar lists the document and its chunk count.*`"] --> 
         E["`***Step 5:* Select or type a question in the chat**<br>*The user asks something about their documents.*`"] --> 
-        F["`***Step 6:* The agent searches every document**<br>*Agentic RAG is used to plan and retrieve an answer with OpenAI GPT model until the agent decides whether it has enough evidence.*`"]
-    end
-    subgraph Row3 [" "]
-        direction LR
+        F["`***Step 6:* The agent searches every document**<br>*Agentic RAG is used to plan and retrieve an answer with OpenAI GPT model until the agent decides whether it has enough evidence.*`"] --> 
         G["`***Step 7:* The app provides an answer with citations**<br>*The answer appears with the source files and the agent's steps.*`"] --> 
         H["`***Step 8:* Remove document from the app <i>(Optional)<i>**<br>*The user clicks the **X** to remove a document from Azure AI Search index and storage account.*`"]
     end
     Row1 --> Row2
-    Row2 --> Row3
     style Row1 fill:transparent,stroke:transparent
     style Row2 fill:transparent,stroke:transparent
-    style Row3 fill:transparent,stroke:transparent
 ```
 
 
