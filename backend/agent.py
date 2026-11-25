@@ -21,9 +21,9 @@ AZURE_OPENAI_CHAT_DEPLOYMENT = os.environ.get("AZURE_OPENAI_CHAT_DEPLOYMENT", "g
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT = os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-small")
 AZURE_OPENAI_API_VERSION = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21")
 TOP_K = int(os.environ.get("RAG_TOP_K", "5"))
-MAX_STEPS = int(os.environ.get("AGENT_MAX_STEPS", "5"))  # model calls that may use tools
-MAX_CHUNK_CHARS = 1500  # keep tool results small so the loop stays cheap
-PER_SOURCE_TOP = int(os.environ.get("RAG_PER_SOURCE_TOP", "2"))  # chunks kept from each document
+MAX_STEPS = int(os.environ.get("AGENT_MAX_STEPS", "5"))
+MAX_CHUNK_CHARS = 1500
+PER_SOURCE_TOP = int(os.environ.get("RAG_PER_SOURCE_TOP", "2"))
 MAX_SOURCES = int(os.environ.get("RAG_MAX_SOURCES", "5"))
 FORCE_COVERAGE = os.environ.get("AGENT_FORCE_COVERAGE", "1").strip().lower() in ("1", "true", "yes")
 
@@ -125,7 +125,7 @@ def search_documents(
     vector = vector or embed(query)
     extra = {}
     if source:
-        escaped = source.replace("'", "''")  # OData string-literal escaping
+        escaped = source.replace("'", "''")
         extra["filter"] = f"source eq '{escaped}'"
     results = search_client.search(
         search_text=query,
@@ -158,7 +158,7 @@ def search_each_source(query: str) -> tuple[list[dict], int, int]:
     def one(src: str) -> list[dict]:
         try:
             return search_documents(query, source=src, top=PER_SOURCE_TOP, vector=vector)
-        except Exception:  # noqa: BLE001 - one failing document shouldn't sink the answer
+        except Exception:
             return []
 
     with ThreadPoolExecutor(max_workers=min(8, len(sources))) as pool:
@@ -191,7 +191,7 @@ def run_tool(name: str, raw_args: str, retrieved: dict) -> tuple[object, str, di
             found = list_sources()
             return found, f"{len(found)} document(s)", args
         return {"error": f"unknown tool '{name}'"}, "unknown tool", args
-    except Exception as exc:  # noqa: BLE001 - let the agent see and recover from tool failures
+    except Exception as exc:
         return {"error": str(exc)}, f"failed: {exc}", args
 
 
@@ -202,7 +202,7 @@ def run_agent(question: str, history: list[dict] | None = None) -> tuple[str, li
     messages.append({"role": "user", "content": question})
 
     steps: list[dict] = []
-    retrieved: dict[str, None] = {}  # ordered, de-duplicated source names
+    retrieved: dict[str, None] = {}
     answer = None
 
     for step_no in range(MAX_STEPS):
@@ -243,7 +243,7 @@ def run_agent(question: str, history: list[dict] | None = None) -> tuple[str, li
                 {"role": "tool", "tool_call_id": call.id, "content": json.dumps(result, ensure_ascii=False)}
             )
 
-    if answer is None:  # step budget used up: force a final answer without tools
+    if answer is None:
         messages.append(
             {
                 "role": "user",

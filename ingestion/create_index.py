@@ -29,6 +29,7 @@ fields = [
     SimpleField(name="id", type=SearchFieldDataType.String, key=True),
     SearchableField(name="content", type=SearchFieldDataType.String),
     SimpleField(name="source", type=SearchFieldDataType.String, filterable=True, facetable=True),
+    SimpleField(name="contentHash", type=SearchFieldDataType.String, filterable=False),
     SearchField(
         name="content_vector",
         type=SearchFieldDataType.Collection(SearchFieldDataType.Single),

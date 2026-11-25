@@ -1,0 +1,4 @@
+[server]
+# Largest file the upload widget accepts, in MB. Must match MAX_UPLOAD_MB in streamlit_app.py.
+maxUploadSize = 200
+headless = true

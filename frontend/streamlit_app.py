@@ -9,7 +9,11 @@ To run locally:
     export FUNCTION_KEY="<function key>"
     streamlit run streamlit_app.py
 """
+import base64
+import hashlib
 import os
+import re
+import time
 
 import requests
 import streamlit as st
@@ -52,6 +56,10 @@ st.markdown(
       }
       [data-testid="stColumn"] button {
         height: 70px;
+
+      /* Sidebar: let long file names wrap instead of overflowing */
+      [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        overflow-wrap: anywhere; word-break: break-word;
       }
     </style>
     """,
@@ -61,6 +69,182 @@ st.markdown(
 if not API_BASE or not FUNCTION_KEY:
     st.error("API_BASE and FUNCTION_KEY environment variables must be set.")
     st.stop()
+
+# ---------------- Sidebar: upload, list, and remove documents ----------------
+ALLOWED_TYPES = ["txt", "pdf", "docx"]
+MAX_UPLOAD_MB = 200
+INDEX_WAIT_SECONDS = 300   # how long the UI waits for indexing before saying it continues in the background
+POLL_SECONDS = 3
+
+
+def _json_or_none(resp):
+    try:
+        return resp.json()
+    except ValueError:
+        return None
+
+
+def _md_escape(text: str) -> str:
+    return re.sub(r"([\\`*_{}\[\]()#+!|~<>])", r"\\\1", text)
+
+
+def upload_document(name: str, data: bytes) -> dict:
+    """Get a write link, PUT the file straight to Blob Storage, then queue indexing."""
+    try:
+        resp = requests.post(f"{API_BASE}/upload-url", params={"code": FUNCTION_KEY},
+                             json={"filename": name}, timeout=60)
+    except requests.RequestException as exc:
+        return {"error": f"Could not reach the backend: {exc}"}
+    link = _json_or_none(resp) or {}
+    if resp.status_code != 200:
+        return {"error": link.get("error", f"Backend returned HTTP {resp.status_code}")}
+
+    try:
+        put = requests.put(
+            link["upload_url"],
+            data=data,
+            headers={"x-ms-blob-type": "BlockBlob", "Content-Type": "application/octet-stream"},
+            timeout=900,
+        )
+        put.raise_for_status()
+    except requests.RequestException as exc:
+        return {"error": f"Upload to storage failed: {exc}"}
+
+    try:
+        resp = requests.post(f"{API_BASE}/index", params={"code": FUNCTION_KEY},
+                             json={"blob": link["blob"]}, timeout=60)
+    except requests.RequestException as exc:
+        return {"error": f"Could not start indexing: {exc}"}
+    if resp.status_code != 202:
+        return {"error": (_json_or_none(resp) or {}).get("error", f"Backend returned HTTP {resp.status_code}")}
+    return {"blob": link["blob"]}
+
+
+def wait_for_indexing(blob: str) -> dict:
+    """Poll the backend until the file is indexed, fails, or the wait runs out."""
+    deadline = time.time() + INDEX_WAIT_SECONDS
+    while time.time() < deadline:
+        try:
+            resp = requests.get(f"{API_BASE}/status", params={"code": FUNCTION_KEY, "blob": blob}, timeout=30)
+            info = _json_or_none(resp) or {}
+        except requests.RequestException:
+            info = {}
+        if info.get("status") in ("indexed", "unchanged", "failed", "missing"):
+            return info
+        time.sleep(POLL_SECONDS)
+    return {"status": "timeout"}
+
+
+def remove_document(name: str) -> dict:
+    """Delete the document's chunks from the index and its blob from storage."""
+    try:
+        resp = requests.delete(f"{API_BASE}/sources", params={"code": FUNCTION_KEY, "name": name}, timeout=120)
+    except requests.RequestException as exc:
+        return {"error": f"Could not reach the backend: {exc}"}
+    body = _json_or_none(resp) or {}
+    if resp.status_code != 200:
+        return {"error": body.get("error", f"Backend returned HTTP {resp.status_code}")}
+    return body
+
+
+@st.cache_data(ttl=20, show_spinner=False)
+def list_indexed_sources(api_base: str, key: str) -> list[dict] | None:
+    """Returns (sources, error). Errors are shown in the sidebar instead of hidden."""
+    try:
+        resp = requests.get(f"{api_base}/sources", params={"code": key}, timeout=30)
+    except requests.RequestException as exc:
+        return None, f"Request failed: {exc}"
+    body = _json_or_none(resp)
+    if body is None:
+        return None, f"HTTP {resp.status_code}, not JSON: {resp.text[:150]}"
+    if resp.status_code != 200 or "error" in body:
+        return None, f"HTTP {resp.status_code}: {body.get('error', 'unexpected response')}"
+    return body.get("sources", []), None
+
+
+def describe_indexing(name: str, info: dict) -> tuple[str, str]:
+    """(streamlit message kind, text) for the result of an upload."""
+    state = info.get("status")
+    if state == "indexed":
+        chunks = info.get("chunks")
+        detail = f" ({chunks} chunks)" if chunks else ""
+        return "success", f"{name} is indexed{detail}. You can ask about it now."
+    if state == "unchanged":
+        return "info", f"{name} was already indexed with identical content, so nothing changed."
+    if state == "failed":
+        return "error", f"Indexing {name} failed: {info.get('error') or 'unknown error'}"
+    if state == "missing":
+        return "error", f"{name} disappeared from storage before it could be indexed."
+    return "info", (f"{name} is uploaded and still being indexed in the background. "
+                    "Large files take longer. Click Refresh list to check.")
+
+
+with st.sidebar:
+    st.header("Upload documents")
+    st.caption(f"PDF, DOCX, or TXT, up to {MAX_UPLOAD_MB} MB. Small files are ready within seconds; large files take longer to index.")
+
+    flash = st.session_state.pop("flash", None)
+    if flash:
+        getattr(st, flash[0])(flash[1])
+
+    uploaded = st.file_uploader("Choose a file", type=ALLOWED_TYPES, label_visibility="collapsed", key="uploader")
+
+    if st.button("Upload and Index Document", use_container_width=True, disabled=uploaded is None):
+        data = uploaded.getvalue()
+        if len(data) > MAX_UPLOAD_MB * 1024 * 1024:
+            st.error(f"{uploaded.name} is larger than {MAX_UPLOAD_MB} MB.")
+        else:
+            with st.status(f"Processing {uploaded.name}", expanded=True) as progress:
+                st.write("Uploading to storage...")
+                result = upload_document(uploaded.name, data)
+                if "error" in result:
+                    outcome = ("error", result["error"])
+                    progress.update(label="Upload failed", state="error")
+                else:
+                    st.write("Extracting text, chunking, embedding, and indexing...")
+                    outcome = describe_indexing(uploaded.name, wait_for_indexing(result["blob"]))
+                    progress.update(label="Finished", state="complete")
+            list_indexed_sources.clear()
+            st.session_state.flash = outcome
+            st.rerun()
+
+    st.subheader("Indexed Documents")
+    if st.button("Refresh list", use_container_width=True):
+        list_indexed_sources.clear()
+
+    sources_list, sources_error = list_indexed_sources(API_BASE, FUNCTION_KEY)
+    if sources_error:
+        st.caption(f"Could not load the document list. {sources_error}")
+    elif not sources_list:
+        st.caption("No documents indexed yet.")
+    else:
+        pending = st.session_state.get("confirm_delete")
+        for src in sources_list:
+            name = src["source"]
+            uid = hashlib.md5(name.encode("utf-8")).hexdigest()[:10]
+            left, right = st.columns([4, 1])
+            left.markdown(f"{_md_escape(name)}")
+            if right.button("**X**", key=f"rm_{uid}", use_container_width=True):
+                st.session_state.confirm_delete = name
+                pending = name
+            if pending == name:
+                st.warning("Remove this document from the index and delete its file from storage?")
+                yes, no = st.columns(2)
+                if yes.button("Confirm", key=f"yes_{uid}", type="primary", use_container_width=True):
+                    with st.spinner(f"Removing {name}..."):
+                        removed = remove_document(name)
+                    list_indexed_sources.clear()
+                    st.session_state.confirm_delete = None
+                    if "error" in removed:
+                        st.session_state.flash = ("error", removed["error"])
+                    else:
+                        gone = "its file was deleted from storage" if removed.get("blob_deleted") else "its file was already gone from storage"
+                        st.session_state.flash = (
+                            "success", f"Removed {name}: {removed['chunks_removed']} chunks deleted from the index, and {gone}.")
+                    st.rerun()
+                if no.button("Cancel", key=f"no_{uid}", use_container_width=True):
+                    st.session_state.confirm_delete = None
+                    st.rerun()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []  # [{"role", "content", "sources", "steps"}]
@@ -75,10 +259,8 @@ def ask(question: str) -> tuple[str, list[str], list[dict]]:
             f"{API_BASE}/chat",
             params={"code": FUNCTION_KEY},
             json={"question": question, "history": history},
-            timeout=200,  # agent runs make several model/search calls
+            timeout=240,  # Function App requests are cut off at ~230s
         )
-        if resp.status_code != 200:
-            return f"Backend error {resp.status_code}: {resp.text[:300]}", [], []
         data = resp.json()
     except (requests.RequestException, ValueError) as exc:
         return f"Request failed: {exc}", [], []
@@ -93,7 +275,8 @@ def show_details(sources: list[str], steps: list[dict]) -> None:
         with st.expander(f"Agent steps ({len(steps)})"):
             for n, step in enumerate(steps, 1):
                 args = ", ".join(f"{k}={v!r}" for k, v in step["args"].items())
-                st.markdown(f"{n}. `{step['tool']}({args})` → {step['result']}")
+                took = f" ({step['seconds']}s)" if "seconds" in step else ""
+                st.markdown(f"{n}. `{step['tool']}({args})` → {step['result']}{took}")
     if sources:
         with st.expander("Sources"):
             for src in sources:
@@ -108,7 +291,7 @@ if clear.button("Clear chat", use_container_width=True):
     st.session_state.pending = None
     st.rerun()
 
-# A prompt comes from the chat box or from an example-question button
+# Prompt comes from chat box or from example-question button
 prompt = st.chat_input("Type a new question...")
 if st.session_state.pending:
     prompt = st.session_state.pending
